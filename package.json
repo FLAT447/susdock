@@ -1,7 +1,7 @@
 {
     "name": "susfs4ksu-lkm-module",
     "type": "module",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "packageManager": "pnpm@12.10.1",
     "license": "GPL-2.0-only",
     "scripts": {
