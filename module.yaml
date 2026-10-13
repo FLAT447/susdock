@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/KernelSU-Modules/tools/main/schemas/module.schema.json
+schemaVersion: 1
+id: susfs4ksu_lkm
+name: SuSFS LKM Loader
+summary: Loads SUSFS as a loadable kernel module (susfs_guard_lkm) via ksud.
+description: README.md
+license: GPL-2.0-only
+homepage: https://github.com/Nixie24/susfs4ksu-lkm-module
+support: https://github.com/Nixie24/susfs4ksu-lkm-module/issues
+tags: [tools]
+metamodule: false
+
+authors:
+  - name: Nix24
+    url: https://nixy.ing
+
+compatibility:
+  androidMinApi: 31
+  architectures: [armeabi-v7a, arm64-v8a]
+
+release:
+  assetPattern: "*.zip"
