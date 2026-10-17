@@ -172,6 +172,9 @@ importers:
       '@types/node':
         specifier: 26.4.0
         version: 26.4.0
+      commitfmt:
+        specifier: ^1.3.0
+        version: 1.3.0
       eslint:
         specifier: 10.12.0
         version: 10.12.0(jiti@2.7.0)
@@ -912,6 +915,40 @@ packages:
   comment-parser@1.4.9:
     resolution: {integrity: sha512-+2AvZKjJaNq9GQljm3tr0utwrig5BL+jgJGvz5rDpGKNIp+ojcRXWUwBbh/sGIi1QCprR6PsKFakub+w1v+4hQ==}
     engines: {node: '>= 12.0.0'}
+
+  commitfmt-darwin-arm64@1.3.0:
+    resolution: {integrity: sha512-2q7o2Jp3fzhPFVg01vyApi4Yi4hjDC+Py3NiDm4NUnXb2qKkRt05ub63SrPqwU5r1KnKyJg5k2wSHblHW4zobA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  commitfmt-darwin-x64@1.3.0:
+    resolution: {integrity: sha512-OlP+NOIm4mlquI3ykfvkZjvbvKpgXFIVWkd01iQLRuoGw/bGqPR8lyTfMX9Z9w25iTM3rbkZBGBJMJyMaeuvfw==}
+    cpu: [x64]
+    os: [darwin]
+
+  commitfmt-linux-arm64@1.3.0:
+    resolution: {integrity: sha512-Q6VHNhQZ/jc0VLQtMyApML9La/U7g28sLGC8jfBw0dHVLSE+uzg0GXjBceo/QzRcTbrTZwxUFlYiX7jq8O4stQ==}
+    cpu: [arm64]
+    os: [linux]
+
+  commitfmt-linux-x64@1.3.0:
+    resolution: {integrity: sha512-m8oWuYWofH9gaS+HLXw1baFRD9o529SKJ2jfhUIYfhXJ/U+uUpoy7BL95PENO1cZQjP6Mu6cqCqenfXLmvzmaA==}
+    cpu: [x64]
+    os: [linux]
+
+  commitfmt-windows-arm64@1.3.0:
+    resolution: {integrity: sha512-5AfxPU0ihYnhNt6oG7TXf3Y4HdPtwgXTxSGQtI9Qt7ihf9+MBjwZWBsfNOef+NwC4zcigf8K2jC8yuf9zAqUew==}
+    cpu: [arm64]
+    os: [win32]
+
+  commitfmt-windows-x64@1.3.0:
+    resolution: {integrity: sha512-c802qtPiu14FaGe+El/wG8A74fnbHofvaOxDiqal0MmEa2A8aS+Zwe6cgTkafW2e5/LLikIl4zH4B1rmP76L+A==}
+    cpu: [x64]
+    os: [win32]
+
+  commitfmt@1.3.0:
+    resolution: {integrity: sha512-LemzgFUENuQUoF4w0PNG3ZsF20OVdtsAwiUvAqHTfw296bq5AfLJftPXvX/lXj1+GSyg99TQbemGfZygZDjNUw==}
+    hasBin: true
 
   confbox@0.1.8:
     resolution: {integrity: sha512-RMtmw0iFkeR4YV+fUOSucriAQNb9g8zFR52MWCtl+cCZOFRNL6zeB395vPzFhEjjn4fMxXudmELnl/KF/WrK6w==}
@@ -2694,6 +2731,33 @@ snapshots:
   comment-parser@1.4.7: {}
 
   comment-parser@1.4.9: {}
+
+  commitfmt-darwin-arm64@1.3.0:
+    optional: true
+
+  commitfmt-darwin-x64@1.3.0:
+    optional: true
+
+  commitfmt-linux-arm64@1.3.0:
+    optional: true
+
+  commitfmt-linux-x64@1.3.0:
+    optional: true
+
+  commitfmt-windows-arm64@1.3.0:
+    optional: true
+
+  commitfmt-windows-x64@1.3.0:
+    optional: true
+
+  commitfmt@1.3.0:
+    optionalDependencies:
+      commitfmt-darwin-arm64: 1.3.0
+      commitfmt-darwin-x64: 1.3.0
+      commitfmt-linux-arm64: 1.3.0
+      commitfmt-linux-x64: 1.3.0
+      commitfmt-windows-arm64: 1.3.0
+      commitfmt-windows-x64: 1.3.0
 
   confbox@0.1.8: {}
 
