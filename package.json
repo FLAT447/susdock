@@ -7,7 +7,7 @@
     "type": "module",
     "version": "0.2.1",
     "private": true,
-    "packageManager": "pnpm@12.11.2",
+    "packageManager": "pnpm@12.14.0",
     "description": "A SuSFS Manager for LKM Setups",
     "author": {
         "name": "Nix24",
@@ -20,24 +20,26 @@
         "build": "jiti scripts/build.ts",
         "webui:build": "pnpm --filter webui run build",
         "lint": "eslint",
+        "postinstall": "shellcheck --version > /dev/null",
         "sync": "syncpack"
     },
     "devEngines": {
         "packageManager": {
             "name": "pnpm",
-            "version": "12.11.2",
+            "version": "12.14.0",
             "onFail": "download"
         }
     },
     "devDependencies": {
         "@antfu/eslint-config": "9.5.1",
         "@types/node": "26.4.0",
-        "commitfmt": "^1.3.0",
+        "commitfmt": "1.3.0",
         "eslint": "10.12.0",
         "eslint-plugin-format": "2.0.1",
         "jiti": "2.7.0",
         "prettier-plugin-css-order": "2.2.0",
         "prettier-plugin-sh": "0.20.2",
+        "shellcheck": "^4.1.0",
         "syncpack": "15.3.3",
         "typescript": "6.0.3"
     }
