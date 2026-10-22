@@ -1,5 +1,314 @@
+import type { ESLint, Rule } from "eslint";
+import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
 import antfu, { parserPlain } from "@antfu/eslint-config";
 
+/*
+ * 直接调用 shellcheck npm 包下载好的原生二进制。
+ * node_modules/.bin/shellcheck 只是转发脚本，自身还要在 PATH 里找 node；
+ * 编辑器里的 ESLint 进程（如 VS Code 插件）未必有 node 在 PATH 中。
+ */
+const projectDir = fileURLToPath(new URL(".", import.meta.url));
+const moduleDir = fileURLToPath(new URL("src/module/", import.meta.url));
+const shellcheckBin = fileURLToPath(new URL(
+    `node_modules/shellcheck/bin/shellcheck${process.platform === "win32" ? ".exe" : ""}`,
+    import.meta.url,
+));
+
+/*
+ * shellcheck 规则选项，与 CLI 参数一一对应：
+ *
+ *   checkSourced      -a, --check-sourced
+ *   enable            -o, --enable
+ *   exclude           -e, --exclude
+ *   include           -i, --include
+ *   severity          -S, --severity
+ *   shell             -s, --shell
+ *   sourcePath        -P, --source-path（可重复）
+ *   externalSources   -x, --external-sources
+ *   rcFile            --rcfile
+ *   noRc              --norc
+ *   extendedAnalysis  --extended-analysis
+ *
+ * 未暴露：--format（固定 json1）、--color（无终端）、--version / --help /
+ * --list-optional（非检查行为）、--wiki-link-count（仅影响文本输出）。
+ */
+interface ShellcheckOptions {
+    /* 规则自身选项：shellcheck 的工作目录，相对路径以项目根为基准 */
+    cwd?: string;
+    checkSourced?: boolean;
+    enable?: Array<number | string> | "all";
+    exclude?: Array<number | string>;
+    include?: Array<number | string>;
+    severity?: "error" | "warning" | "info" | "style";
+    shell?: "sh" | "bash" | "dash" | "ksh" | "busybox";
+    sourcePath?: string[];
+    externalSources?: boolean;
+    rcFile?: string;
+    noRc?: boolean;
+    extendedAnalysis?: boolean;
+}
+
+function buildShellcheckArgs(options: ShellcheckOptions): string[] {
+    const args = ["--format=json1"];
+
+    if (options.checkSourced)
+        args.push("--check-sourced");
+
+    if (options.enable !== undefined)
+        args.push(`--enable=${Array.isArray(options.enable) ? options.enable.join(",") : options.enable}`);
+
+    if (options.exclude !== undefined && options.exclude.length > 0)
+        args.push(`--exclude=${options.exclude.join(",")}`);
+
+    if (options.include !== undefined && options.include.length > 0)
+        args.push(`--include=${options.include.join(",")}`);
+
+    if (options.severity)
+        args.push(`--severity=${options.severity}`);
+
+    if (options.shell)
+        args.push(`--shell=${options.shell}`);
+
+    for (const path of options.sourcePath ?? [])
+        args.push(`--source-path=${path}`);
+
+    if (options.externalSources)
+        args.push("--external-sources");
+
+    if (options.rcFile !== undefined)
+        args.push(`--rcfile=${options.rcFile}`);
+
+    if (options.noRc)
+        args.push("--norc");
+
+    if (options.extendedAnalysis !== undefined)
+        args.push(`--extended-analysis=${options.extendedAnalysis}`);
+
+    /* 从 stdin 读取，确保检查的是 ESLint 当前内存中的文本（--fix 时不是磁盘内容） */
+    args.push("-");
+
+    return args;
+}
+
+interface ShellcheckReplacement {
+    line: number;
+    column: number;
+    endLine: number;
+    endColumn: number;
+    replacement: string;
+}
+
+/*
+ * shellcheck 的行列号从 1 开始，ESLint 的 fixer 需要绝对偏移量。
+ * 任意两段修改区间重叠时放弃整条修复，避免只应用一半生成坏代码。
+ */
+function toFixes(
+    fixer: Rule.RuleFixer,
+    replacements: ShellcheckReplacement[],
+    offsetAt: (line: number, column: number) => number,
+) {
+    const ranges = replacements
+        .map(replacement => ({
+            range: [
+                offsetAt(replacement.line, replacement.column),
+                offsetAt(replacement.endLine, replacement.endColumn),
+            ] as [number, number],
+            text: replacement.replacement,
+        }))
+        .sort((a, b) => a.range[0] - b.range[0]);
+
+    for (let index = 1; index < ranges.length; index++) {
+        if (ranges[index].range[0] < ranges[index - 1].range[1])
+            return null;
+    }
+
+    return ranges.map(item => fixer.replaceTextRange(item.range, item.text));
+}
+
+const shellcheckPlugin = {
+    rules: {
+        shellcheck: {
+            meta: {
+                type: "problem",
+                fixable: "code",
+                docs: {
+                    description: "Run shellcheck on shell scripts under src/module",
+                },
+                schema: [{
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                        cwd: {
+                            type: "string",
+                            description: "Working directory for shellcheck, relative to the project root (default: src/module)",
+                        },
+                        checkSourced: {
+                            type: "boolean",
+                            description: "Include warnings from sourced files (-a)",
+                        },
+                        enable: {
+                            description: "Optional checks to enable, or \"all\" (-o)",
+                            oneOf: [
+                                { type: "array", items: { type: ["string", "number"] } },
+                                { type: "string", enum: ["all"] },
+                            ],
+                        },
+                        exclude: {
+                            type: "array",
+                            items: { type: ["string", "number"] },
+                            description: "Warning codes to exclude (-e)",
+                        },
+                        include: {
+                            type: "array",
+                            items: { type: ["string", "number"] },
+                            description: "Only consider these warning codes (-i)",
+                        },
+                        severity: {
+                            type: "string",
+                            enum: ["error", "warning", "info", "style"],
+                            description: "Minimum severity to report (-S)",
+                        },
+                        shell: {
+                            type: "string",
+                            enum: ["sh", "bash", "dash", "ksh", "busybox"],
+                            description: "Script dialect (-s)",
+                        },
+                        sourcePath: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "Paths used to resolve source directives (-P)",
+                        },
+                        externalSources: {
+                            type: "boolean",
+                            description: "Allow following source outside FILES (-x)",
+                        },
+                        rcFile: {
+                            type: "string",
+                            description: "Use this configuration file instead of .shellcheckrc",
+                        },
+                        noRc: {
+                            type: "boolean",
+                            description: "Do not look for .shellcheckrc files",
+                        },
+                        extendedAnalysis: {
+                            type: "boolean",
+                            description: "Enable dataflow analysis (default true)",
+                        },
+                    },
+                }],
+            },
+
+            create(context: Rule.RuleContext) {
+                const options = (context.options[0] ?? {}) as ShellcheckOptions;
+                const cwd = options.cwd === undefined ? moduleDir : resolve(projectDir, options.cwd);
+                const text = context.sourceCode.text;
+                let output = "{\"comments\":[]}";
+
+                try {
+                    output = execFileSync(shellcheckBin, buildShellcheckArgs(options), {
+                        cwd,
+                        input: text,
+                        encoding: "utf8",
+                    });
+                }
+                catch (error) {
+                    /*
+                     * shellcheck 发现问题时退出码为 1，stdout 仍是完整 JSON；
+                     * 其余错误继续抛出，避免静默跳过检查。
+                     */
+                    const { status, stdout, code } = error as {
+                        status?: number;
+                        stdout?: string;
+                        code?: string;
+                    };
+
+                    if (code === "ENOENT") {
+                        throw new Error(
+                            `[shellcheck] 无法执行 ${shellcheckBin}（cwd: ${cwd}）。`
+                            + " 请确认二进制已下载且目录存在，必要时先运行一次 `pnpm exec shellcheck --version`。",
+                        );
+                    }
+
+                    if (status !== 1 || typeof stdout !== "string") {
+                        throw error;
+                    }
+
+                    output = stdout;
+                }
+
+                const { comments } = JSON.parse(output) as {
+                    comments: Array<{
+                        file: string;
+                        code: number;
+                        level: string;
+                        message: string;
+                        line: number;
+                        column: number;
+                        endLine: number;
+                        endColumn: number;
+                        fix?: {
+                            replacements: ShellcheckReplacement[];
+                        } | null;
+                    }>;
+                };
+
+                /* 预先算好每行起始偏移，供 shellcheck 的 1-based 行列号换算使用 */
+                const lineStarts = [0];
+
+                for (let index = text.indexOf("\n"); index !== -1; index = text.indexOf("\n", index + 1))
+                    lineStarts.push(index + 1);
+
+                function offsetAt(line: number, column: number): number {
+                    return Math.min(text.length, (lineStarts[line - 1] ?? text.length) + column - 1);
+                }
+
+                /*
+                 * shellcheck 在跟随 source / 启用扩展分析时，可能对同一位置重复输出
+                 * 相同的检查码，这里按“检查码 + 位置”去重；
+                 * 同时忽略被 source 文件的诊断（file 不是 "-"）——那些行号属于别的
+                 * 文件，由该文件自己的 ESLint 检查负责报告。
+                 */
+                const seen = new Set<string>();
+
+                for (const comment of comments) {
+                    /* stdin 模式下当前文件的诊断 file 为 "-"，其余来自被 source 的文件 */
+                    if (comment.file !== "-")
+                        continue;
+
+                    const key = [comment.code, comment.line, comment.column, comment.endLine, comment.endColumn].join(":");
+
+                    if (seen.has(key))
+                        continue;
+
+                    seen.add(key);
+
+                    const fix = comment.fix;
+
+                    context.report({
+                        /*
+                         * shellcheck 的行列号从 1 开始，而 ESLint 的 loc 列号从 0 开始。
+                         */
+                        loc: {
+                            start: { line: comment.line, column: comment.column - 1 },
+                            end: { line: comment.endLine, column: comment.endColumn - 1 },
+                        },
+                        message: `SC${comment.code}: ${comment.message} (${comment.level})`,
+                        fix: fix ? fixer => toFixes(fixer, fix.replacements, offsetAt) : undefined,
+                    });
+                }
+
+                return {};
+            },
+        } satisfies Rule.RuleModule,
+    },
+} satisfies ESLint.Plugin;
+
+/**
+ * Eslint Configuration
+ */
 export default antfu({
     formatters: {
         css: "prettier",
@@ -391,7 +700,10 @@ export default antfu({
         "unicorn/prefer-structured-clone": "warn",
     },
 }, {
-    files: ["**/*.sh"],
+    /**
+     * shfmt 格式化规则
+     */
+    files: ["src/module/**/*.sh"],
     languageOptions: {
         parser: parserPlain,
     },
@@ -399,7 +711,42 @@ export default antfu({
         "format/prettier": ["warn", {
             parser: "sh",
             plugins: ["prettier-plugin-sh"],
-            tabWidth: 4,
+            variant: 1,
+            keepComments: true,
+            keepPadding: false,
+            simplify: false,
+            binaryNextLine: true,
+            switchCaseIndent: true,
+            spaceRedirects: true,
+            indent: 4,
+            minify: false,
+            singleLine: false,
+            functionNextLine: false,
+        }],
+    },
+}, {
+    /*
+     * shellcheck 语义检查
+     */
+    files: ["src/module/**/*.sh"],
+    plugins: {
+        shellcheck: shellcheckPlugin,
+    },
+    rules: {
+        /*
+         * 可用选项见上方 ShellcheckOptions：
+         * cwd / checkSourced / enable / exclude / include / severity / shell /
+         * sourcePath / externalSources / rcFile / noRc / extendedAnalysis。
+         *
+         * cwd 相对项目根目录；示例：
+         * ["warn", { severity: "warning", exclude: [2086] }]
+         */
+        "shellcheck/shellcheck": ["warn", {
+            cwd: "src/module",
+            externalSources: true,
+            checkSourced: true,
+            exclude: ["SC2034"],
+            shell: "bash",
         }],
     },
 }, {
