@@ -1,15 +1,14 @@
 {
     "js/ts.tsdk.path": "node_modules/typescript/lib",
+
     "eslint.format.enable": true,
-    "editor.formatOnSave": false,
-    "editor.codeActionsOnSave": {
-        "source.fixAll.eslint": "explicit",
-        "source.organizeImports": "never"
-    },
+
     "eslint.options": {
         "overrideConfigFile": "eslint.config.ts"
     },
+
     "eslint.nodePath": "node_modules",
+
     "eslint.rules.customizations": [
         {
             "rule": "style/*",
@@ -62,6 +61,7 @@
             "fixable": true
         }
     ],
+
     "eslint.validate": [
         "typescript",
         "html",
@@ -72,6 +72,15 @@
         "yaml",
         "toml",
         "xml",
+        "css",
         "shellscript"
-    ]
+    ],
+
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "editor.formatOnSave": true,
+
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit",
+        "source.organizeImports": "never"
+    },
 }
