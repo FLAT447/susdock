@@ -1,19 +1,33 @@
-import { readFileSync } from "node:fs";
-import process from "node:process";
+const NUMERIC = /^\d+$/;
 
-const pkg = JSON.parse(
-    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-) as { version?: string };
-const version = String(pkg.version);
+export function parseVersion(version: string) {
+    if (typeof version !== "string")
+        throw new Error("version must be a string");
 
-const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
-if (!match) {
-    console.error(`version.ts: package.json version 必须是 A.B.C，当前: ${pkg.version}`);
-    process.exit(1);
+    const versionParts = version.split(".");
+
+    if (versionParts.length !== 3)
+        throw new Error("version must be in the format {major}.{minor}.{patch}");
+
+    const nums = versionParts.map(part => {
+        if (!NUMERIC.test(part))
+            throw new Error(`version part "${part}" must be a non-negative integer`);
+        return Number(part);
+    });
+
+    const [major, minor, patch] = nums;
+
+    if (minor > 99 || patch > 99)
+        throw new Error("minor and patch must be <= 99 to avoid versionCode overflow");
+
+    const versionCode = major * 10000 + minor * 100 + patch;
+
+    return { major, minor, patch, versionCode };
 }
 
-// versionCode = 主版本 * 10000 + 次版本 * 100 + 修订号
-const major = Number(match[1]);
-const minor = Number(match[2]);
-const patch = Number(match[3]);
-console.log(`${version} ${major * 10000 + minor * 100 + patch}`);
+if (import.meta.main) {
+    const packageJson = await import("../package.json", { with: { type: "json" } });
+    const version = packageJson.default.version;
+    const { versionCode } = parseVersion(version);
+    console.log(version, versionCode);
+}
