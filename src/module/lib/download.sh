@@ -63,8 +63,9 @@ download() {
         wget) wget -q --timeout=15 -O "$tmp" "$url" ;;
         busybox_wget) busybox wget -q -O "$tmp" "$url" ;;
     esac
+    rc=$?
 
-    if [ $? -ne 0 ]; then
+    if [ "$rc" -ne 0 ]; then
         rm -f "$tmp"
         log ERROR "download failed: $url"
         return "$DL_ERR_NET"

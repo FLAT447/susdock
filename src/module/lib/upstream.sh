@@ -18,8 +18,9 @@
     return 1
 }
 
-# Upstream error codes
-US_ERR_HTTP=1
+# Upstream error codes.
+# Must stay >1: check_update() uses 1 for "already up-to-date".
+US_ERR_HTTP=6
 US_ERR_PARSE=2
 US_ERR_NOFILE=3
 US_ERR_HASH=4
@@ -39,8 +40,37 @@ _json_urls() {
         | sed -E 's/^[^:]*:[[:space:]]*"([^"]*)".*/\1/'
 }
 
+# Extract "<url>|<sha256>" for the asset with the exact given name.
+# The repository publishes one .ko per Android/kernel pair, so the URL must be
+# selected by device fingerprint instead of taking the first asset.
+# Usage: _json_asset <file> <name>
+_json_asset() {
+    awk -v target="$2" '
+        function value(line) {
+            sub(/^[^:]*:[[:space:]]*"/, "", line)
+            sub(/".*$/, "", line)
+            return line
+        }
+        /"name":/ { name = value($0) }
+        /"digest":/ {
+            digest = ""
+            if ($0 ~ /"sha256:/) {
+                digest = $0
+                sub(/.*"sha256:/, "", digest)
+                sub(/".*/, "", digest)
+            }
+        }
+        /"browser_download_url":/ {
+            if (name == target)
+                print value($0) "|" digest
+            name = ""
+            digest = ""
+        }
+    ' "$1"
+}
+
 # Fetch release JSON and resolve remote info
-# Sets: _RV (version), _RU (main url), _RS (sha256), _RULIST (all urls)
+# Sets: _RV (version), _RU (matched asset url), _RS (sha256), _RULIST (all urls)
 _us_resolve() {
     _tmp=$(mktemp)
     download "$UPSTREAM_API" "$_tmp" || {
@@ -57,19 +87,23 @@ _us_resolve() {
     }
 
     _RULIST=$(_json_urls "$_tmp")
-    _RU=$(echo "$_RULIST" | head -1)
 
-    _cu=$(echo "$_RULIST" | grep -i 'checksums\|sha256' | head -1)
+    # Asset names look like "susfs_guard_lkm-android14-6.1.ko".
+    # Prefer the kernel's GKI branch: a device upgraded to a newer Android
+    # release may still run an older kernel branch.
+    _av=$(android_kernel_version 2> /dev/null)
+    [ -n "$_av" ] || _av=$(android_version 2> /dev/null)
+    _av=${_av%%.*}
+    _kv=$(kernel_version 2> /dev/null)
+    _aname="${SUSFS_MODULE_NAME}-android${_av}-${_kv}.ko"
+    _ainfo=$(_json_asset "$_tmp" "$_aname")
     rm -f "$_tmp"
 
-    _RS=""
-    if [ -n "$_cu" ]; then
-        _ctmp=$(mktemp)
-        if download "$_cu" "$_ctmp"; then
-            _aname=$(basename "$_RU")
-            _RS=$(grep -m1 "$_aname" "$_ctmp" 2> /dev/null | awk '{print $1}')
-        fi
-        rm -f "$_ctmp"
+    _RU=${_ainfo%%|*}
+    _RS=${_ainfo#*|}
+
+    if [ -z "$_RU" ]; then
+        log WARN "no asset for android ${_av:-unknown} / kernel ${_kv:-unknown}: $_aname"
     fi
 
     log INFO "remote version=$_RV"
@@ -79,8 +113,8 @@ _us_resolve() {
 # Compare remote and local version to detect update
 # Returns 0 if update needed, 1 if up-to-date, >1 on error
 check_update() {
-    _rv=$(get_remote_version) || return "$US_ERR_HTTP"
-    _lv=$(get_local_version) || return "$US_ERR_LOCAL"
+    _rv=$(get_remote_version) || return $?
+    _lv=$(get_local_version) || return $?
 
     if [ "$_rv" = "$_lv" ]; then
         log INFO "up-to-date ($_lv)"
@@ -113,7 +147,7 @@ get_remote_sha256sum() {
     return 0
 }
 
-# Get remote main package download URL (first asset)
+# Get the download URL matching this device
 # Usage: get_remote_url
 # Outputs url to stdout
 get_remote_url() {
@@ -139,12 +173,14 @@ get_remote_urls() {
     return 0
 }
 
-# Get remote info as a tuple
+# Get remote info as a tuple. "|" is used as the separator because the sha256
+# may be empty; space separation would collapse fields during word splitting.
 # Usage: get_remote
-# Outputs "<version> <sha256> <url>" to stdout
+# Outputs "<version>|<sha256>|<url>" to stdout
 get_remote() {
     _us_resolve || return $?
-    echo "$_RV $_RS $_RU"
+    [ -n "$_RU" ] || return "$US_ERR_PARSE"
+    printf '%s|%s|%s\n' "$_RV" "$_RS" "$_RU"
     return 0
 }
 
@@ -157,7 +193,7 @@ get_local_version() {
         return "$US_ERR_NOFILE"
     }
 
-    _v=$(cat "$UPSTREAM_VERSION_FILE" 2> /dev/null | tr -d '[:space:]')
+    _v=$(tr -d '[:space:]' < "$UPSTREAM_VERSION_FILE" 2> /dev/null)
     [ -n "$_v" ] || {
         log ERROR "local version file is empty"
         return "$US_ERR_NOFILE"

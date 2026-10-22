@@ -11,15 +11,19 @@ MOD_ERR_WRITE=4
 # Outputs remote version to stdout if update needed
 # Returns 0 if update needed, 1 if up-to-date, >1 on error
 mod_check() {
-    if check_update; then
-        _rv=$(get_remote_version) || return "$MOD_ERR_CHECK"
+    check_update
+    rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+        # check_update already resolved the remote tag into $_rv, so there is
+        # no need to hit the API a second time.
+        # shellcheck disable=SC2154
         echo "$_rv"
         return 0
     fi
 
-    rc=$?
     [ "$rc" -eq 1 ] && return 1
-    return "$MOD_ERR_CHECK"
+    return "$rc"
 }
 
 # Download and install update (takes effect after reboot)
@@ -27,14 +31,20 @@ mod_check() {
 # Returns 0 on success, non-zero on failure
 mod_update() {
     _remote=$(get_remote) || return "$MOD_ERR_CHECK"
-    set -- $_remote
-    _ver="$1"
-    _sha="$2"
-    _url="$3"
+
+    # get_remote uses "|" as separator because the sha256 may be empty.
+    IFS='|' read -r _ver _sha _url << EOF
+$_remote
+EOF
 
     [ -n "$_url" ] || {
-        log ERROR "no download URL"
+        log ERROR "no download URL for this device"
         return "$MOD_ERR_CHECK"
+    }
+
+    [ -n "$_sha" ] || {
+        log ERROR "no sha256 available from upstream"
+        return "$MOD_ERR_HASH"
     }
 
     mkdir -p "$MOD_DIR" 2> /dev/null || {
