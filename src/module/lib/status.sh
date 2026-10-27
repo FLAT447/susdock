@@ -33,8 +33,15 @@ susfs_version() {
         return "$ST_ERR_VERSION"
     }
 
-    echo "$_raw" | sed 's/^v//'
+    echo "${_raw#v}"
     return 0
+}
+
+# Get the GKI branch from the kernel release string
+# Usage: android_kernel_version
+# Outputs e.g. "14" for "6.6.30-android14-11-g...", empty if absent
+android_kernel_version() {
+    uname -r 2> /dev/null | sed -n 's/.*-android\([0-9][0-9]*\)-.*/\1/p'
 }
 
 # Get Android version string

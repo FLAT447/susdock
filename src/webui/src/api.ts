@@ -1,72 +1,188 @@
-// 和模块里的 shell 脚本打交道。界面相关的东西一概不放在这里。
+/*
+ * 和模块里的 shell 脚本打交道。界面相关的东西一概不放在这里。
+ * 接口细节见 docs/backend-api.md。
+ */
 import { exec, moduleInfo } from "kernelsu";
 import { first, parseKV } from "./protocol";
+import { loadUpstream } from "./upstream";
 
-const MODDIR = "/data/adb/modules/susfs4ksu_lkm";
+const FALLBACK_MODULE_ID = "susdock";
+const MODULE_ROOT = "/data/adb/modules";
+const MAX_LOG_LINES = 2000;
 
-export interface Status {
-    label: string;
+export type LogLevel = "DEBUG" | "ERROR" | "INFO" | "WARN";
+
+export interface ModuleStatus {
+    android: string;
     kernel: string;
-    variant: string;
-    susfs: string;
-    size: string;
+    koSize: number;
     loaded: boolean;
+    local: string;
+    rebootRequired: boolean;
+    running: string;
 }
 
-export interface UpdateInfo {
-    tag: string;
-    variant: string;
-}
+export type UpdateCheck =
+    | { state: "available"; version: string }
+    | { state: "current"; version: string }
+    | { state: "error"; message: string };
 
 export interface UpdateResult {
-    ok: boolean;
-    reason: string;
+    errno: number;
     log: string;
-    tag: string;
+    ok: boolean;
 }
 
-async function run(command: string): Promise<string> {
-    const { errno, stdout, stderr } = await exec(command);
-    if (errno !== 0) {
-        throw new Error((stderr || stdout || `命令失败 (errno ${errno})`).trim());
+interface ExecOutput {
+    errno: number;
+    stderr: string;
+    stdout: string;
+}
+
+// module.prop 的 id 由 package.json 的 name 生成，不要写死路径
+function moduleDir(): string {
+    try {
+        const info = JSON.parse(moduleInfo()) as { id?: unknown };
+        if (typeof info.id === "string" && /^[\w.-]+$/.test(info.id)) {
+            return `${MODULE_ROOT}/${info.id}`;
+        }
     }
+    catch {
+        // moduleInfo() 在非 KernelSU 环境不可用
+    }
+
+    return `${MODULE_ROOT}/${FALLBACK_MODULE_ID}`;
+}
+
+// 单引号包裹，内部单引号按 POSIX 规则转义成 '\''
+function shellQuote(value: string): string {
+    return `'${value.replaceAll("'", String.raw`'\''`)}'`;
+}
+
+// 更新源存在 localStorage，这里通过环境变量交给 entry.sh，脚本不写配置文件
+function upstreamEnv(): string {
+    const { api, mirror } = loadUpstream();
+    let env = `UPSTREAM_API=${shellQuote(api)}`;
+
+    if (mirror !== "") {
+        env += ` UPSTREAM_MIRROR=${shellQuote(mirror)}`;
+    }
+
+    return `${env} `;
+}
+
+function run(args: string): Promise<ExecOutput> {
+    if (!("ksu" in globalThis)) {
+        return Promise.reject(new Error("未在 KernelSU 环境中运行"));
+    }
+
+    return exec(`${upstreamEnv()}sh '${moduleDir()}/entry.sh' ${args}`);
+}
+
+async function runOk(args: string): Promise<string> {
+    const { errno, stderr, stdout } = await run(args);
+    if (errno !== 0) {
+        throw new Error(cleanError(stderr || stdout) || `命令失败 (errno ${errno})`);
+    }
+
     return stdout;
 }
 
-export async function readStatus(): Promise<Status> {
-    const m = parseKV(await run(`sh ${MODDIR}/status.sh`));
+// stderr 里混着普通日志，取最后一条 [ERROR] 作为错误信息
+function cleanError(text: string): string {
+    const lines = text.split("\n").map(line => line.trim()).filter(line => line !== "");
+    let message = "";
+
+    for (const line of lines) {
+        if (line.includes("[ERROR]")) {
+            message = line.replace(/^.*\[ERROR\]\s*/, "");
+        }
+    }
+
+    if (message !== "") {
+        return message;
+    }
+
+    return lines[lines.length - 1] ?? "";
+}
+
+function toNumber(value: string): number {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+export async function readStatus(): Promise<ModuleStatus> {
+    const map = parseKV(await runOk("status quick"));
+
     return {
-        label: first(m, "state_label", "未知"),
-        kernel: first(m, "kernel", "未知"),
-        variant: first(m, "variant", "-"),
-        susfs: first(m, "susfs", "未知"),
-        size: first(m, "size", "0"),
-        loaded: first(m, "loaded") === "1",
+        android: first(map, "android_version", "未知"),
+        kernel: first(map, "kernel_version", "未知"),
+        koSize: toNumber(first(map, "ko_size", "0")),
+        loaded: first(map, "loaded") === "true",
+        local: first(map, "local_version", "未知"),
+        rebootRequired: first(map, "reboot_required") === "true",
+        running: first(map, "running_version", "未知"),
     };
 }
 
-export async function checkUpdate(): Promise<UpdateInfo> {
-    const m = parseKV(await run(`sh ${MODDIR}/check.sh`));
-    return { tag: first(m, "tag"), variant: first(m, "variant") };
+/*
+ * `mod check` 用退出码表达结果：
+ *   0 → 有新版本，stdout 是上游 tag
+ *   1 → 已是最新（stderr 里没有 [ERROR]）
+ *   >1 → 出错
+ */
+export async function checkUpdate(): Promise<UpdateCheck> {
+    const { errno, stderr, stdout } = await run("mod check");
+
+    if (errno === 0) {
+        return { state: "available", version: stdout.trim() };
+    }
+
+    if (stderr.includes("[ERROR]")) {
+        return { state: "error", message: cleanError(stderr) };
+    }
+
+    return { state: "current", version: "" };
 }
 
 export async function applyUpdate(): Promise<UpdateResult> {
-    const { errno, stdout, stderr } = await exec(`sh ${MODDIR}/update.sh`);
-    const log = `${stdout}${stderr}`.trim();
-    const m = parseKV(log);
-    return {
-        ok: errno === 0 && first(m, "result") === "ok",
-        reason: first(m, "reason"),
-        log,
-        tag: first(m, "tag"),
-    };
+    const { errno, stderr, stdout } = await run("mod update");
+    const log = [stderr, stdout]
+        .filter(part => part.trim() !== "")
+        .join("\n")
+        .trim();
+
+    return { errno, log, ok: errno === 0 };
+}
+
+export function readLog(lines = 300): Promise<string> {
+    const count = Math.min(Math.max(Math.trunc(lines), 1), MAX_LOG_LINES);
+    return runOk(`log tail ${count}`);
+}
+
+export async function clearLog(): Promise<void> {
+    await runOk("log clear");
+}
+
+function isLogLevel(value: string): value is LogLevel {
+    return value === "DEBUG" || value === "INFO" || value === "WARN" || value === "ERROR";
+}
+
+export async function readLogLevel(): Promise<LogLevel> {
+    const value = (await runOk("log level")).trim().toUpperCase();
+    return isLogLevel(value) ? value : "INFO";
+}
+
+export async function setLogLevel(level: LogLevel): Promise<LogLevel> {
+    const value = (await runOk(`log set-level ${level}`)).trim().toUpperCase();
+    return isLogLevel(value) ? value : level;
 }
 
 // 模块自身的版本，从管理器拿；拿不到就返回空串
 export function moduleVersion(): string {
     try {
-        const info = JSON.parse(moduleInfo()) as { version?: string };
-        return info.version ?? "";
+        const info = JSON.parse(moduleInfo()) as { version?: unknown };
+        return typeof info.version === "string" ? info.version : "";
     }
     catch {
         return "";

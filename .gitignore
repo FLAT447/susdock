@@ -4,11 +4,6 @@ build/
 log/
 update-out/
 
-# module.prop 由 module.prop.template 生成，不是源文件
-src/module/module.prop
-# 刷入后才有的东西
-src/module/mods/*
-
 # Node dependencies
 node_modules/
 .pnpm-store/

@@ -24,18 +24,14 @@ log() {
     shift
     msg="$*"
 
-    # filter
     [ "$(_level_num "$level")" -ge "$(_level_num "$LOG_LEVEL")" ] || return 0
 
     ts=$(date '+%Y-%m-%d %H:%M:%S' 2> /dev/null || echo "----")
     line="[$ts] [$level] $msg"
 
-    # stderr
     echo "$line" >&2
 
-    # file
     mkdir -p "$LOG_DIR" 2> /dev/null || return 0
-    # Slice log files
     if [ -f "$LOG_FILE" ]; then
         size=$(wc -c < "$LOG_FILE" 2> /dev/null || echo 0)
         [ "$size" -gt "$LOG_MAX_BYTES" ] && mv "$LOG_FILE" "$LOG_FILE.1" 2> /dev/null

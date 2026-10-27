@@ -3,95 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SUSFS LKM</title>
+    <title>SusDock Web UI</title>
 </head>
 <body>
-    <header class="page-head">
-        <h1>SUSFS LKM</h1>
-        <div class="page-meta">
-            <span class="version" id="module-version"></span>
-            <button id="theme-btn" class="theme-btn" type="button" title="切换主题">🌙</button>
-        </div>
-    </header>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+        <symbol id="icon-backspace" viewBox="0 -960 960 960">
+            <path d="m560-424 76 76q11 11 28 11t28-11q11-11 11-28t-11-28l-76-76 76-76q11-11 11-28t-11-28q-11-11-28-11t-28 11l-76 76-76-76q-11-11-28-11t-28 11q-11 11-11 28t11 28l76 76-76 76q-11 11-11 28t11 28q11 11 28 11t28-11l76-76ZM360-160q-19 0-36-8.5T296-192L116-432q-16-21-16-48t16-48l180-240q11-15 28-23.5t36-8.5h440q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H360Z"/>
+        </symbol>
+        <symbol id="icon-light" viewBox="0 -960 960 960">
+            <path d="M338.5-338.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM80-440q-17 0-28.5-11.5T40-480q0-17 11.5-28.5T80-520h80q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440H80Zm720 0q-17 0-28.5-11.5T760-480q0-17 11.5-28.5T800-520h80q17 0 28.5 11.5T920-480q0 17-11.5 28.5T880-440h-80ZM451.5-771.5Q440-783 440-800v-80q0-17 11.5-28.5T480-920q17 0 28.5 11.5T520-880v80q0 17-11.5 28.5T480-760q-17 0-28.5-11.5Zm0 720Q440-63 440-80v-80q0-17 11.5-28.5T480-200q17 0 28.5 11.5T520-160v80q0 17-11.5 28.5T480-40q-17 0-28.5-11.5ZM226-678l-43-42q-12-11-11.5-28t11.5-29q12-12 29-12t28 12l42 43q11 12 11 28t-11 28q-11 12-27.5 11.5T226-678Zm494 495-42-43q-11-12-11-28.5t11-27.5q11-12 27.5-11.5T734-282l43 42q12 11 11.5 28T777-183q-12 12-29 12t-28-12Zm-42-495q-12-11-11.5-27.5T678-734l42-43q11-12 28-11.5t29 11.5q12 12 12 29t-12 28l-43 42q-12 11-28 11t-28-11ZM183-183q-12-12-12-29t12-28l43-42q12-11 28.5-11t27.5 11q12 11 11.5 27.5T282-226l-42 43q-11 12-28 11.5T183-183Z"/>
+        </symbol>
+        <symbol id="icon-dark" viewBox="0 -960 960 960">
+            <path d="M480-120q-151 0-255.5-104.5T120-480q0-138 90-239.5T440-838q13-2 23 3.5t16 14.5q6 9 6.5 21t-7.5 23q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q11-7 22.5-6.5T819-479q10 5 15.5 15t3.5 24q-14 138-117.5 229T480-120Z"/>
+        </symbol>
+        <symbol id="icon-setting" viewBox="0 -960 960 960">
+            <path d="M433-80q-27 0-46.5-18T363-142l-9-66q-13-5-24.5-12T307-235l-62 26q-25 11-50 2t-39-32l-47-82q-14-23-8-49t27-43l53-40q-1-7-1-13.5v-27q0-6.5 1-13.5l-53-40q-21-17-27-43t8-49l47-82q14-23 39-32t50 2l62 26q11-8 23-15t24-12l9-66q4-26 23.5-44t46.5-18h94q27 0 46.5 18t23.5 44l9 66q13 5 24.5 12t22.5 15l62-26q25-11 50-2t39 32l47 82q14 23 8 49t-27 43l-53 40q1 7 1 13.5v27q0 6.5-2 13.5l53 40q21 17 27 43t-8 49l-48 82q-14 23-39 32t-50-2l-60-26q-11 8-23 15t-24 12l-9 66q-4 26-23.5 44T527-80h-94Zm49-260q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z"/>
+        </symbol>
+    </svg>
 
-    <section class="card">
-        <div class="card-head">
-            <h2>状态</h2>
-            <button id="refresh-btn" class="btn ghost small">刷新</button>
-        </div>
-        <div class="status-head">
-            <span id="status-badge" class="badge">读取中…</span>
-        </div>
-        <div class="row">
-            <span class="row-k">内核版本</span>
-            <span class="row-v" id="status-kernel">-</span>
-        </div>
-        <div class="row">
-            <span class="row-k">GKI 变体</span>
-            <span class="row-v" id="status-variant">-</span>
-        </div>
-        <div class="row">
-            <span class="row-k">SuSFS 版本</span>
-            <span class="row-v" id="status-susfs">-</span>
-        </div>
-        <div class="row">
-            <span class="row-k">驱动大小</span>
-            <span class="row-v" id="status-size">-</span>
-        </div>
-    </section>
+    <sd-app>
+        <header class="page-head">
+            <h1>SusDock</h1>
+            <div class="page-meta">
+                <span class="version" id="version"></span>
+                <button class="theme-btn" type="button" id="theme" title="切换主题" aria-label="切换主题">
+                    <svg class="icon icon-dark" aria-hidden="true"><use href="#icon-dark"></use></svg>
+                    <svg class="icon icon-light" aria-hidden="true"><use href="#icon-light"></use></svg>
+                </button>
+            </div>
+        </header>
 
-    <section class="card">
-        <div class="card-head">
-            <h2>检测更新</h2>
-        </div>
+        <section class="card">
+            <div class="card-head">
+                <h2>状态</h2>
+                <button class="btn ghost small" type="button" id="refresh-status">刷新</button>
+            </div>
 
-        <div id="view-idle">
-            <div class="update-actions">
-                <button id="check-btn" class="btn">检测更新</button>
-            </div>
-        </div>
+            <sd-status-card>
+                <div class="status-head">
+                    <sd-badge id="state-badge">读取中…</sd-badge>
+                    <sd-badge id="reboot-badge" tone="new" hidden>需重启</sd-badge>
+                </div>
+                <sd-row data-field="android">
+                    <span class="row-k">Android</span>
+                    <span class="row-v">-</span>
+                </sd-row>
+                <sd-row data-field="kernel">
+                    <span class="row-k">内核版本</span>
+                    <span class="row-v">-</span>
+                </sd-row>
+                <sd-row data-field="running">
+                    <span class="row-k">运行版本</span>
+                    <span class="row-v">-</span>
+                </sd-row>
+                <sd-row data-field="local">
+                    <span class="row-k">本地版本</span>
+                    <span class="row-v">-</span>
+                </sd-row>
+                <sd-row data-field="koSize">
+                    <span class="row-k">驱动大小</span>
+                    <span class="row-v">-</span>
+                </sd-row>
+            </sd-status-card>
+        </section>
 
-        <div id="view-busy" hidden>
-            <div class="update-actions">
-                <button class="btn" disabled><span class="spinner"></span><span id="busy-text"></span></button>
+        <section class="card">
+            <div class="card-head">
+                <h2>检测更新</h2>
+                <button class="icon-btn" type="button" id="upstream-open" title="更新源设置" aria-label="更新源设置">
+                    <svg class="icon" aria-hidden="true"><use href="#icon-setting"></use></svg>
+                </button>
             </div>
-        </div>
 
-        <div id="view-available" hidden>
-            <div class="update-head">
-                <span class="badge new">发现新版本</span>
-                <span class="tag" id="available-tag"></span>
-            </div>
-            <div class="update-actions">
-                <button id="do-update-btn" class="btn primary">更新</button>
-            </div>
-        </div>
+            <sd-update-card>
+                <div data-view="idle">
+                    <div class="update-actions">
+                        <button class="btn" type="button" data-action="check">检测更新</button>
+                    </div>
+                </div>
 
-        <div id="view-uptodate" hidden>
-            <div class="update-head">
-                <span class="badge ok">已是最新版本</span>
-                <span class="tag" id="uptodate-tag"></span>
-            </div>
-            <div class="update-actions">
-                <button id="recheck-btn" class="btn ghost">再查一次</button>
-            </div>
-        </div>
+                <div data-view="busy" hidden>
+                    <div class="update-actions">
+                        <button class="btn busy" type="button" disabled>
+                            <span class="busy-text"></span>
+                        </button>
+                    </div>
+                </div>
 
-        <div id="view-failed" hidden>
-            <div class="update-head">
-                <span class="badge fail">更新失败</span>
-            </div>
-            <div class="empty" id="failed-reason"></div>
-            <div class="update-actions">
-                <button id="retry-btn" class="btn primary">重试</button>
-            </div>
-            <pre class="log" id="failed-log"></pre>
-        </div>
+                <div data-view="available" hidden>
+                    <div class="update-head">
+                        <sd-badge tone="new">发现新版本</sd-badge>
+                        <span class="tag" data-role="available-tag"></span>
+                    </div>
+                    <div class="update-actions">
+                        <button class="btn primary" type="button" data-action="update">更新</button>
+                    </div>
+                </div>
 
-        <div id="view-note" hidden>
-            <div class="empty" id="note-text"></div>
-        </div>
-    </section>
+                <div data-view="current" hidden>
+                    <div class="update-head">
+                        <sd-badge tone="ok">已是最新版本</sd-badge>
+                        <span class="tag" data-role="current-tag"></span>
+                    </div>
+                    <div class="update-actions">
+                        <button class="btn ghost" type="button" data-action="check">再查一次</button>
+                    </div>
+                </div>
+
+                <div data-view="failed" hidden>
+                    <div class="update-head">
+                        <sd-badge tone="fail">更新失败</sd-badge>
+                    </div>
+                    <p class="empty" data-role="reason"></p>
+                    <div class="update-actions">
+                        <button class="btn primary" type="button" data-action="update">重试</button>
+                    </div>
+                    <pre class="log" data-role="log"></pre>
+                </div>
+
+                <div data-view="note" hidden>
+                    <p class="empty" data-role="note"></p>
+                    <div class="update-actions">
+                        <button class="btn ghost" type="button" data-action="check">重新检测</button>
+                    </div>
+                </div>
+            </sd-update-card>
+        </section>
+
+        <section class="card">
+            <div class="card-head">
+                <h2>日志</h2>
+            </div>
+
+            <sd-log-panel>
+                <div class="toolbar">
+                    <label class="level">
+                        <span>等级</span>
+                        <select class="select" id="log-level">
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO" selected>INFO</option>
+                            <option value="WARN">WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </label>
+                    <div class="tools">
+                        <button class="btn ghost small" type="button" id="log-auto">自动刷新：开</button>
+                        <button class="btn ghost small" type="button" id="log-order">排序：正序</button>
+                        <button class="btn ghost small" type="button" id="log-refresh">刷新</button>
+                        <button class="btn ghost small" type="button" id="log-clear">清空</button>
+                    </div>
+                </div>
+                <pre class="log" id="log-output"></pre>
+                <p class="meta" id="log-meta">读取中…</p>
+            </sd-log-panel>
+        </section>
+
+        <sd-upstream-dialog>
+            <dialog class="modal" id="upstream-dialog">
+                <div class="modal-head">
+                    <h2>更新源</h2>
+                    <button class="icon-btn modal-close" type="button" id="upstream-close" title="关闭" aria-label="关闭">✕</button>
+                </div>
+
+                <p class="modal-hint">检测更新与下载驱动时使用这个地址。</p>
+
+                <div class="preset-row">
+                    <button class="btn ghost small" type="button" data-preset="official">官方</button>
+                    <button class="btn ghost small" type="button" data-preset="mirror">国内加速</button>
+                </div>
+
+                <div class="input-row">
+                    <input class="input" id="upstream-input" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.github.com/…">
+                    <button class="icon-btn" type="button" id="upstream-clear" title="清空" aria-label="清空">
+                        <svg class="icon" aria-hidden="true"><use href="#icon-backspace"></use></svg>
+                    </button>
+                </div>
+
+                <p class="modal-note" id="upstream-note"></p>
+                <p class="modal-error" id="upstream-error" hidden></p>
+
+                <div class="modal-actions">
+                    <button class="btn ghost" type="button" id="upstream-cancel">取消</button>
+                    <button class="btn primary" type="button" id="upstream-save">保存</button>
+                </div>
+            </dialog>
+        </sd-upstream-dialog>
+    </sd-app>
 
     <script type="module" src="/src/main.ts"></script>
 </body>

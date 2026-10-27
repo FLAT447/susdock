@@ -33,10 +33,11 @@ status_reboot_required() {
     return 1
 }
 
-# Get summary info
-# Usage: status_info
+# Get local-only summary info. No network access, so this is cheap enough to
+# call on every UI refresh.
+# Usage: status_quick
 # Outputs key=value lines to stdout
-status_info() {
+status_quick() {
     _android=$(android_version 2> /dev/null || echo "unknown")
     _kernel=$(kernel_version 2> /dev/null || echo "unknown")
 
@@ -54,7 +55,12 @@ status_info() {
 
     _running=$(susfs_version 2> /dev/null || echo "unknown")
     _local=$(get_local_version 2> /dev/null || echo "unknown")
-    _remote=$(get_remote_version 2> /dev/null || echo "unknown")
+
+    _size=0
+    if [ -f "$UPSTREAM_LOCAL_TARGET" ]; then
+        _size=$(wc -c < "$UPSTREAM_LOCAL_TARGET" 2> /dev/null | tr -d '[:space:]')
+    fi
+    [ -n "$_size" ] || _size=0
 
     echo "android_version=$_android"
     echo "kernel_version=$_kernel"
@@ -62,6 +68,18 @@ status_info() {
     echo "reboot_required=$_reboot"
     echo "running_version=$_running"
     echo "local_version=$_local"
+    echo "ko_size=$_size"
+    return 0
+}
+
+# Get summary info including the remote version. This performs a network
+# request, so it can take a while on a slow connection.
+# Usage: status_info
+# Outputs key=value lines to stdout
+status_info() {
+    status_quick
+
+    _remote=$(get_remote_version 2> /dev/null || echo "unknown")
     echo "remote_version=$_remote"
     return 0
 }
@@ -75,6 +93,7 @@ status_dispatch() {
         installed) status_installed "$@" ;;
         susfs_version) status_susfs_version "$@" ;;
         reboot_required) status_reboot_required "$@" ;;
+        quick) status_quick "$@" ;;
         info) status_info "$@" ;;
         *) err "unknown status subcommand: ${_sub:-<empty>}" ;;
     esac
