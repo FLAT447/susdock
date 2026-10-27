@@ -81,7 +81,8 @@ function main(): void {
     if (!existsSync(webuiDistPath))
         throw new Error(`WebUI dist not found at "${webuiDistPath}"`);
 
-    cpSync(webuiDistPath, join(distPath, "webui"), { recursive: true });
+    // KernelSU only serves the WebUI from a `webroot` directory.
+    cpSync(webuiDistPath, join(distPath, "webroot"), { recursive: true });
     log("WebUI build completed successfully.", Types.success);
 }
 
