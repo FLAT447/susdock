@@ -17,6 +17,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v7
@@ -27,9 +29,16 @@ jobs:
 
       - name: Determine tag
         id: tag
+        shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "tag=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+            git fetch --tags --force
+            tag="$(git tag --points-at HEAD | grep '^v' | head -n 1 || true)"
+            if [ -z "$tag" ]; then
+              echo "::error::No release tag found on the workflow_run HEAD commit (${GITHUB_SHA})"
+              exit 1
+            fi
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
           fi
