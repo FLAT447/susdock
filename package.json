@@ -1,8 +1,19 @@
 {
-    "name": "susfs4ksu-lkm-module",
+    "name": "susdock",
+    "kernelsu": {
+        "name": "SusDock",
+        "updateJson": "https://raw.githubusercontent.com/Nixie24/susfs4ksu-lkm-module/update/update.json"
+    },
     "type": "module",
     "version": "0.2.1",
-    "packageManager": "pnpm@12.10.1",
+    "private": true,
+    "packageManager": "pnpm@12.11.2",
+    "description": "A SuSFS Manager for LKM Setups",
+    "author": {
+        "name": "Nix24",
+        "email": "nix24nya@gmail.com",
+        "url": "https://nixy.ing"
+    },
     "license": "GPL-2.0-only",
     "scripts": {
         "dev": "pnpm --filter webui run dev",
@@ -15,7 +26,7 @@
     "devEngines": {
         "packageManager": {
             "name": "pnpm",
-            "version": "12.10.1",
+            "version": "12.11.2",
             "onFail": "download"
         }
     },
