@@ -1,35 +1,63 @@
-# susfs4ksu-lkm-module
+# SusDock
 
-[inforcqb/susfs4ksu-lkm](https://github.com/inforcqb/susfs4ksu-lkm) 的自动安装器。
-不在本地编译内核模块，只按设备指纹去上游拉预编译好的 `.ko`。
+SuSFS 的 LKM 管理器，跑在 KernelSU 上。不在本地编内核模块，按设备指纹去上游取预编译好的 `.ko`。
 
-- 刷入时识别设备（`<Android 版本>-<内核版本>`），逐个下载候选 `susfs_guard_lkm-<变体>.ko`，
-  用内核实际试载，第一个能加载的就被暂存到 `mods/`
-- 同时生成一份 `mods/susfs_guard_lkm.json`，记下变体、上游版本和 sha256
-- 开机时由 post-fs-data 脚本离线加载暂存好的 `.ko`（不联网，不会卡开机），
-  并把结果写进 `module.prop` 的 description
-- 想更新就在设备上手动跑 `update.sh`
+## 功能
+
+- 查 [inforcqb/susfs4ksu-lkm](https://github.com/inforcqb/susfs4ksu-lkm) 的最新发布
+- 按 `<Android 版本>-<内核版本>` 选对应的 `.ko`，sha256 对得上才写进 `/data/adb/susdock/mod/`
+- 装完留下重启标记，重启后生效
+- 自带 WebUI：看状态、查更新、翻日志（可倒序）、清日志、调等级、换更新源
 
 ## 要求
 
-- KernelSU，arm64，GKI 内核。
-- 内核版本：main 5.10 / 5.15 / 6.1 / 6.6，dev 6.12 / 6.18。
-- 刷入时需要联网，`.ko` 自动从上游下载。
+- KernelSU，arm64，GKI 内核
+- Android 12 及以上
+- 查更新和下载驱动要联网；只看状态不用
 
-## 更新驱动
+## 命令
 
-```sh
-sh /data/adb/modules/susfs4ksu_lkm/update.sh
-```
-
-## 打包
+入口是 `entry.sh`，所有子命令从这里分发：
 
 ```sh
-# 等价于 ./src/module/build.sh
-pnpm module:build
+MODDIR=/data/adb/modules/susdock
+
+sh "$MODDIR/entry.sh" status quick        # 本机状态（不联网）
+sh "$MODDIR/entry.sh" status info         # 本机状态 + 上游版本（联网）
+sh "$MODDIR/entry.sh" mod check           # 检查更新
+sh "$MODDIR/entry.sh" mod update          # 下载并安装，重启后生效
+sh "$MODDIR/entry.sh" log tail 200        # 日志尾部
+sh "$MODDIR/entry.sh" log set-level DEBUG # 改日志等级
 ```
 
-产物在 `dist/`。`module.prop` 是生成物，源文件是 `module.prop.template`。
+参数、输出格式和退出码见 [docs/backend-api.md](docs/backend-api.md)。
+
+## 更新源
+
+默认走 GitHub API 取 releases。「检测更新」卡片右上角的齿轮可以换：
+
+| 选项     | 实际行为                                                        |
+| -------- | --------------------------------------------------------------- |
+| 官方     | 版本信息和驱动都直连 GitHub                                     |
+| 国内加速 | 版本信息仍走 GitHub API，`.ko` 下载套一层 `https://ghfast.top/` |
+| 自定义   | 自己填 Releases API 地址                                        |
+
+ghfast.top 只代理文件下载，不接 `api.github.com`（实测返回 403），所以加速只作用在 `.ko` 上。
+
+设置存在浏览器 localStorage，不写进模块配置文件。脚本侧对应 `UPSTREAM_API` 和 `UPSTREAM_MIRROR` 两个环境变量。
+
+## 开发
+
+```sh
+pnpm install
+pnpm dev          # WebUI 开发服务器
+pnpm build        # 打包模块，产物在 dist/
+pnpm lint         # ESLint + shfmt + shellcheck
+```
+
+`dist/webroot/` 是 KernelSU 读取的 WebUI 目录，`dist/module.prop` 由构建脚本生成。
+
+提交前会自动跑一遍 ESLint（`.githooks/pre-commit`），`pnpm install` 时通过 `core.hooksPath` 挂上。
 
 ## 许可
 
