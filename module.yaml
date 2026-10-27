@@ -5,8 +5,8 @@ name: SusDock
 summary: A SuSFS Manager for LKM Setups
 description: README.md
 license: GPL-2.0-only
-homepage: https://github.com/Nixie24/susfs4ksu-lkm-module
-support: https://github.com/Nixie24/susfs4ksu-lkm-module/issues
+homepage: https://github.com/Nixie24/susdock
+support: https://github.com/Nixie24/susdock/issues
 tags: [tools]
 metamodule: false
 
