@@ -1,4 +1,4 @@
-/* 主题 */
+/* 主题令牌 */
 
 :root {
     --bg: #f5f5f7;
@@ -33,8 +33,15 @@
     --press: rgb(255 255 255 / 0.12);
 }
 
+/* 基础 */
+
 * {
     box-sizing: border-box;
+}
+
+/* 自定义元素默认 display 会盖掉 UA 的 [hidden]，这里统一兜底 */
+[hidden] {
+    display: none !important;
 }
 
 body {
@@ -58,6 +65,32 @@ body {
         sans-serif;
 }
 
+sd-app,
+sd-status-card,
+sd-update-card,
+sd-log-panel {
+    display: block;
+}
+
+/* 弹窗只是 <dialog> 的容器，不参与布局 */
+sd-upstream-dialog {
+    display: contents;
+}
+
+/* 图标 */
+
+.icon-sprite {
+    display: none;
+}
+
+.icon {
+    fill: currentColor;
+    width: 1em;
+    height: 1em;
+}
+
+/* 页头 */
+
 .page-head {
     display: flex;
     justify-content: space-between;
@@ -71,14 +104,13 @@ body {
     font-size: 20px;
 }
 
-/* 版本号 + 主题按钮，靠右摆一排 */
 .page-meta {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.page-head .version {
+.version {
     color: var(--text-dim);
     font-size: 12px;
     font-family: var(--mono);
@@ -94,10 +126,66 @@ body {
     background: transparent;
     width: 32px;
     height: 32px;
-    font-size: 15px;
+    color: var(--text-dim);
+    font-size: 18px;
     line-height: 1;
     -webkit-tap-highlight-color: transparent;
 }
+
+.theme-btn:active {
+    background: var(--press);
+}
+
+/* 浅色下显示月亮（点了切到深色），深色下显示太阳 */
+.theme-btn .icon-light {
+    display: none;
+}
+
+.dark .theme-btn .icon-light {
+    display: block;
+}
+
+.dark .theme-btn .icon-dark {
+    display: none;
+}
+
+/* 纯图标按钮 */
+
+.icon-btn {
+    display: inline-flex;
+    flex: none;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    padding: 4px;
+    color: var(--text-dim);
+    font-size: 22px;
+    line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.icon-btn:active {
+    background: var(--press);
+}
+
+/* 键盘焦点统一用主题色，避免浏览器默认的黄色描边 */
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.theme-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.btn:focus:not(:focus-visible),
+.icon-btn:focus:not(:focus-visible),
+.theme-btn:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* 卡片 */
 
 .card {
     margin-bottom: 14px;
@@ -123,55 +211,56 @@ body {
 /* 状态 */
 
 .status-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 10px;
 }
 
-.badge {
+sd-badge {
     display: inline-block;
     border-radius: 20px;
+    background: var(--bg);
     padding: 3px 10px;
+    color: var(--text-dim);
     font-weight: 600;
     font-size: 13px;
 }
 
-.badge.ok {
+sd-badge[tone="ok"] {
     background: var(--ok-bg);
     color: var(--ok-fg);
 }
 
-.badge:not(.ok):not(.fail):not(.new) {
-    background: var(--bg);
-    color: var(--text-dim);
-}
-
-.badge.fail {
+sd-badge[tone="fail"] {
     background: var(--fail-bg);
     color: var(--fail-fg);
 }
 
-.badge.new {
+sd-badge[tone="new"] {
     background: var(--new-bg);
     color: var(--new-fg);
 }
 
-.row {
+sd-row {
     display: flex;
     gap: 12px;
     border-top: 1px solid var(--line);
     padding: 5px 0;
 }
 
-.status-head + .row {
+/* 状态徽章下方的第一行不需要上边框 */
+sd-status-card > sd-row:first-of-type {
     border-top: 0;
 }
 
-.row-k {
+sd-row .row-k {
     flex: none;
     width: 84px;
     color: var(--text-dim);
 }
 
-.row-v {
+sd-row .row-v {
     flex: 1;
     min-width: 0;
     font-size: 12.5px;
@@ -195,24 +284,6 @@ body {
     font-family: var(--mono);
 }
 
-.log {
-    margin: 0;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--bg);
-    padding: 10px 12px;
-    font-size: 12px;
-    line-height: 1.6;
-    font-family: var(--mono);
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.log {
-    max-height: 40vh;
-    overflow-y: auto;
-}
-
 .empty {
     padding: 10px 0;
     color: var(--text-dim);
@@ -220,6 +291,70 @@ body {
 
 .update-actions {
     margin-top: 12px;
+}
+
+/* 日志 */
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.level {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+}
+
+.select {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    padding: 5px 10px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--mono);
+}
+
+.tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.log {
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    padding: 10px 12px;
+    max-height: 40vh;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.6;
+    font-family: var(--mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+sd-log-panel .log {
+    min-height: 120px;
+    max-height: 46vh;
+}
+
+.meta {
+    margin: 8px 0 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: var(--mono);
 }
 
 /* 按钮 */
@@ -237,7 +372,7 @@ body {
     font-weight: 600;
     font-size: 14px;
     font-family: inherit;
-    /* 手机上没有 :hover，按住时的反馈靠 :active 和这个叠层 */
+    white-space: nowrap;
     -webkit-tap-highlight-color: transparent;
     transition:
         transform 0.06s ease,
@@ -249,15 +384,9 @@ body {
     cursor: default;
 }
 
-/* 按下：压下去一点、颜色压暗，松开自动回弹 */
 .btn:not(:disabled):active {
     transform: scale(0.96);
     filter: brightness(0.88);
-}
-
-.theme-btn:active,
-.btn.ghost:not(:disabled):active {
-    background: var(--press);
 }
 
 .btn.primary {
@@ -270,22 +399,135 @@ body {
     color: var(--accent);
 }
 
+.btn.ghost:not(:disabled):active {
+    background: var(--press);
+}
+
+.btn.ghost.active {
+    border-color: var(--accent);
+    background: var(--new-bg);
+    color: var(--new-fg);
+}
+
 .btn.small {
     padding: 5px 12px;
     font-size: 13px;
 }
 
-.spinner {
+/* 加载指示器用伪元素，避免在 HTML 里塞多余节点 */
+.btn.busy::before {
     animation: spin 0.8s linear infinite;
     border: 2px solid rgb(255 255 255 / 0.35);
     border-top-color: #fff;
     border-radius: 50%;
     width: 13px;
     height: 13px;
+    content: "";
 }
 
 @keyframes spin {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* 弹窗 */
+
+.modal {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--card);
+    padding: 16px 18px 18px;
+    width: min(420px, calc(100vw - 32px));
+    max-width: none;
+    color: var(--text);
+    font-family: inherit;
+}
+
+.modal::backdrop {
+    background: rgb(0 0 0 / 0.45);
+}
+
+.modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.modal-head h2 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.modal-close {
+    font-size: 15px;
+}
+
+.modal-hint {
+    margin: 0 0 14px;
+    color: var(--text-dim);
+    font-size: 12.5px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.modal-note {
+    margin: 8px 0 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: var(--mono);
+}
+
+.modal-error {
+    margin: 8px 0 0;
+    color: var(--fail-fg);
+    font-size: 12.5px;
+}
+
+.preset-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.preset-row .btn {
+    flex: 1;
+    justify-content: center;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg);
+    padding: 0 4px 0 10px;
+}
+
+.input-row:focus-within {
+    border-color: var(--accent);
+}
+
+.input {
+    flex: 1;
+    outline: none;
+    border: 0;
+    background: transparent;
+    padding: 9px 0;
+    min-width: 0;
+    color: var(--text);
+    font-size: 12.5px;
+    font-family: var(--mono);
+}
+
+.input::placeholder {
+    color: var(--text-dim);
 }
