@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Lint the commit message through the package script.
+# Enabled through core.hooksPath, installed by the prepare script.
+
+msg_file="$1"
+
+# Let git-generated messages through unchanged.
+case "$(head -n 1 "$msg_file" 2> /dev/null)" in
+    "Merge "* | "Revert "* | "fixup! "* | "squash! "*)
+        exit 0
+        ;;
+esac
+
+if ! command -v pnpm > /dev/null 2>&1; then
+    echo "commit-msg: pnpm unavailable, skipping" >&2
+    exit 0
+fi
+
+root=$(git rev-parse --show-toplevel 2> /dev/null) || exit 0
+cd "$root" || exit 0
+
+exec pnpm run commit:lint < "$msg_file"

@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Lint the working tree before the commit is created.
+# Enabled through core.hooksPath, installed by the prepare script.
+
+if ! command -v pnpm > /dev/null 2>&1; then
+    echo "pre-commit: pnpm unavailable, skipping" >&2
+    exit 0
+fi
+
+root=$(git rev-parse --show-toplevel 2> /dev/null) || exit 0
+cd "$root" || exit 0
+
+if ! pnpm exec eslint .; then
+    echo "pre-commit: lint failed, run 'pnpm exec eslint . --fix'" >&2
+    exit 1
+fi

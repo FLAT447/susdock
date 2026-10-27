@@ -20,6 +20,8 @@
         "build": "jiti scripts/build.ts",
         "webui:build": "pnpm --filter webui run build",
         "lint": "eslint",
+        "commit:lint": "commitfmt --lint",
+        "prepare": "git config core.hooksPath .githooks || true",
         "postinstall": "shellcheck --version > /dev/null",
         "sync": "syncpack"
     },
