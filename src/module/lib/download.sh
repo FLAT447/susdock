@@ -8,7 +8,6 @@ DL_ERR_NET=4
 DL_ERR_EMPTY=5
 DL_ERR_WRITE=6
 
-# Detect available download tool
 _dl_tool() {
     command -v curl > /dev/null 2>&1 && {
         echo curl

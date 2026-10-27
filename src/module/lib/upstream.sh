@@ -69,6 +69,29 @@ _json_asset() {
     ' "$1"
 }
 
+# The accelerator (ghfast.top) only proxies files, not the API. Prefix the
+# release asset URL so the .ko download benefits from it.
+# Usage: _us_asset_url <url>
+_us_asset_url() {
+    [ -n "$UPSTREAM_MIRROR" ] || {
+        printf '%s' "$1"
+        return 0
+    }
+
+    case "$1" in
+        https://github.com/*) printf '%s%s' "$UPSTREAM_MIRROR" "$1" ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+# Read a URL list from stdin and print it with the mirror prefix applied.
+_us_asset_urls() {
+    while IFS= read -r _line; do
+        _us_asset_url "$_line"
+        echo
+    done
+}
+
 # Fetch release JSON and resolve remote info
 # Sets: _RV (version), _RU (matched asset url), _RS (sha256), _RULIST (all urls)
 _us_resolve() {
@@ -86,7 +109,7 @@ _us_resolve() {
         return "$US_ERR_PARSE"
     }
 
-    _RULIST=$(_json_urls "$_tmp")
+    _RULIST=$(_json_urls "$_tmp" | _us_asset_urls)
 
     # Asset names look like "susfs_guard_lkm-android14-6.1.ko".
     # Prefer the kernel's GKI branch: a device upgraded to a newer Android
@@ -99,13 +122,14 @@ _us_resolve() {
     _ainfo=$(_json_asset "$_tmp" "$_aname")
     rm -f "$_tmp"
 
-    _RU=${_ainfo%%|*}
+    _RU=$(_us_asset_url "${_ainfo%%|*}")
     _RS=${_ainfo#*|}
 
     if [ -z "$_RU" ]; then
         log WARN "no asset for android ${_av:-unknown} / kernel ${_kv:-unknown}: $_aname"
     fi
 
+    log DEBUG "upstream api=$UPSTREAM_API mirror=${UPSTREAM_MIRROR:-<none>}"
     log INFO "remote version=$_RV"
     return 0
 }

@@ -101,6 +101,16 @@ mod_clear_reboot() {
     return 0
 }
 
+# Print the effective update source. The setting itself lives in the WebUI
+# (localStorage) and reaches the module through UPSTREAM_API / UPSTREAM_MIRROR.
+# Usage: mod_upstream
+mod_upstream() {
+    printf 'upstream=%s\n' "$UPSTREAM_API"
+    printf 'mirror=%s\n' "$UPSTREAM_MIRROR"
+    printf 'official=%s\n' "$UPSTREAM_API_OFFICIAL"
+    return 0
+}
+
 # Dispatch mod subcommands
 # Usage: mod_dispatch <subcommand> [args...]
 mod_dispatch() {
@@ -111,6 +121,7 @@ mod_dispatch() {
         update) mod_update "$@" ;;
         version) mod_version "$@" ;;
         clear-reboot) mod_clear_reboot "$@" ;;
+        upstream) mod_upstream "$@" ;;
         *) err "unknown mod subcommand: ${_sub:-<empty>}" ;;
     esac
 }
