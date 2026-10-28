@@ -26,18 +26,21 @@ US_ERR_NOFILE=3
 US_ERR_HASH=4
 US_ERR_LOCAL=5
 
-# Extract first string value by key from a JSON file
+# Extract first string value by key from a JSON file.
+# Works on both pretty-printed and minified JSON: grep -o finds the
+# "key": "value" pair wherever it sits on the line.
 # Usage: _json_get <file> <key>
 _json_get() {
-    grep -m1 "\"$2\"" "$1" 2> /dev/null \
-        | sed -E 's/^[^:]*:[[:space:]]*"([^"]*)".*/\1/'
+    grep -o "\"$2\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$1" 2> /dev/null \
+        | head -n 1 \
+        | sed -E 's/^[^:]*:[[:space:]]*"([^"]*)"$/\1/'
 }
 
 # Extract all browser_download_url values from a JSON file
 # Usage: _json_urls <file>
 _json_urls() {
-    grep '"browser_download_url"' "$1" 2> /dev/null \
-        | sed -E 's/^[^:]*:[[:space:]]*"([^"]*)".*/\1/'
+    grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" 2> /dev/null \
+        | sed -E 's/^[^:]*:[[:space:]]*"([^"]*)"$/\1/'
 }
 
 # Extract "<url>|<sha256>" for the asset with the exact given name.
@@ -45,7 +48,15 @@ _json_urls() {
 # selected by device fingerprint instead of taking the first asset.
 # Usage: _json_asset <file> <name>
 _json_asset() {
-    awk -v target="$2" '
+    # Minified JSON keeps every field on one line. Break objects and fields
+    # onto separate lines so the state machine below sees one field per line.
+    awk '{
+        gsub(/\[{/, "[\n{")
+        gsub(/},{/, "}\n{")
+        gsub(/,[[:space:]]*"/, ",\n\"")
+        print
+    }' "$1" 2> /dev/null \
+        | awk -v target="$2" '
         function value(line) {
             sub(/^[^:]*:[[:space:]]*"/, "", line)
             sub(/".*$/, "", line)
@@ -66,7 +77,7 @@ _json_asset() {
             name = ""
             digest = ""
         }
-    ' "$1"
+    '
 }
 
 # The accelerator (ghfast.top) only proxies files, not the API. Prefix the
@@ -104,7 +115,11 @@ _us_resolve() {
 
     _RV=$(_json_get "$_tmp" "tag_name")
     [ -n "$_RV" ] || {
-        log ERROR "cannot parse tag_name"
+        # GitHub returns {"message": "..."} for errors such as rate limiting.
+        # Show it so the log says why parsing failed.
+        _msg=$(_json_get "$_tmp" "message")
+        log ERROR "cannot parse tag_name${_msg:+ (upstream: $_msg)}"
+        log DEBUG "upstream response: $(head -c 200 "$_tmp" 2> /dev/null | tr '\n' ' ')"
         rm -f "$_tmp"
         return "$US_ERR_PARSE"
     }
