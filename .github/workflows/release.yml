@@ -38,6 +38,9 @@ jobs:
       - name: build
         run: pnpm build
 
+      - name: pack
+        run: pnpm run pack
+
       - name: publish
         uses: softprops/action-gh-release@v3
         with:
