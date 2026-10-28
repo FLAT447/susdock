@@ -225,11 +225,17 @@ test_customize_refresh() {
 
 test_uninstall_cleanup() {
     setup
-    mkdir -p "$T/data/post-fs-data.d"
+    mkdir -p "$T/data/post-fs-data.d" "$T/data/module/mod" "$T/data/module/logs"
     : > "$T/data/post-fs-data.d/module.sh"
+    : > "$T/data/module/mod/susfs_guard_lkm.ko"
+    : > "$T/data/module/mod/version"
+    : > "$T/data/module/logs/module.log"
 
     bash "$T/module/uninstall.sh" > /dev/null 2>&1
     assert_missing "$T/data/post-fs-data.d/module.sh" "卸载应删除开机脚本"
+    assert_missing "$T/data/module/mod/susfs_guard_lkm.ko" "卸载应删除驱动"
+    assert_exists "$T/data/module/logs/module.log" "卸载应保留日志"
+    assert_exists "$T/data/module/mod/version" "卸载应保留版本记录"
 
     teardown
 }
