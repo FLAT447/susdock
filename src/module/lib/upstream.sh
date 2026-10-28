@@ -21,18 +21,20 @@ US_ERR_NOFILE=3
 # "cannot parse tag_name".
 # Usage: release_json
 release_json() {
-    _tmp="${DATA_DIR}/release.$$.json"
+    # Do not name this _tmp: download() reuses _tmp for its own scratch file
+    # and would overwrite the path before cat runs.
+    _json_file="${DATA_DIR}/release.$$.json"
     mkdir -p "$DATA_DIR" 2> /dev/null
 
-    download "$UPSTREAM_API" "$_tmp" || {
+    download "$UPSTREAM_API" "$_json_file" || {
         log ERROR "failed to fetch release info"
-        rm -f "$_tmp"
+        rm -f "$_json_file"
         return "$US_ERR_HTTP"
     }
 
-    cat "$_tmp"
+    cat "$_json_file"
     _rc=$?
-    rm -f "$_tmp"
+    rm -f "$_json_file"
     return "$_rc"
 }
 

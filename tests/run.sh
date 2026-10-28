@@ -148,6 +148,24 @@ test_release_json() {
     teardown
 }
 
+test_release_json_scratch_collision() {
+    setup
+    printf '{"tag_name":"v1.5.3","assets":[]}' > "$T/fake.json"
+
+    # download() 会用 _tmp 做自己的临时文件，这里模拟同样的行为
+    out=$(mod_call "
+        download() {
+            _tmp=\"\$2.tmp.\$\$\"
+            cp '$T/fake.json' \"\$_tmp\"
+            mv \"\$_tmp\" \"\$2\"
+        }
+        release_json
+    ")
+    assert_contains "$out" '"tag_name":"v1.5.3"' "download 的临时变量不应影响输出"
+
+    teardown
+}
+
 test_release_failure() {
     setup
 
@@ -244,6 +262,7 @@ for test in \
     test_boot_script_paths \
     test_boot_script_respects_disable \
     test_release_json \
+    test_release_json_scratch_collision \
     test_release_failure \
     test_update_requires_args \
     test_update_rejects_bad_sha \
