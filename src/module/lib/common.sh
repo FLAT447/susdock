@@ -26,7 +26,6 @@ UPSTREAM_MIRROR=""                                                              
 UPSTREAM_VERSION_FILE="${MOD_DIR}/version"                                            # File to store the current version of the module
 UPSTREAM_LOCAL_TARGET="${MOD_DIR}/susfs_guard_lkm.ko"                                 # Local target file path for the downloaded kernel module
 : "SUSFS"                                                                             #
-SUSFS_MODULE_NAME="susfs_guard_lkm"                                                   # Kernel module name in lsmod
 SUSFS_KSU_SUSFS_BIN="/data/adb/ksu/bin/ksu_susfs"                                     # Path to the ksu_susfs binary
 : "REBOOT"                                                                            #
 REBOOT_FLAG="${MOD_DIR}/reboot"                                                       # Flag file to indicate that a reboot is required after module update

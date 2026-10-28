@@ -4,17 +4,18 @@
 ST_ERR_TOOL=1
 ST_ERR_VERSION=2
 
-# Check if susfs module is loaded via lsmod
+# Check whether SuSFS is available in the running kernel.
+# SuSFS hides its own module from lsmod, so asking ksu_susfs is the only
+# reliable check. A non-zero exit means the kernel does not have it enabled.
 # Usage: susfs_installed
-# Returns 0 if loaded, 1 if not loaded, >1 on error
+# Returns 0 if available, 1 if not, >1 when ksu_susfs is missing
 susfs_installed() {
-    command -v lsmod > /dev/null 2>&1 || {
-        log ERROR "lsmod not available"
+    [ -x "$SUSFS_KSU_SUSFS_BIN" ] || {
+        log ERROR "ksu_susfs not found: $SUSFS_KSU_SUSFS_BIN"
         return "$ST_ERR_TOOL"
     }
 
-    lsmod | grep -q "^${SUSFS_MODULE_NAME} " && return 0
-    return 1
+    "$SUSFS_KSU_SUSFS_BIN" show version > /dev/null 2>&1
 }
 
 # Get running susfs version from ksu_susfs

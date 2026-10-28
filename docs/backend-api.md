@@ -106,7 +106,9 @@ stdout: true | false
 exit:   0 已加载 / 1 未加载或无法检测
 ```
 
-`lsmod` 不可用时返回 `false`，退出码 1，stderr 里是 `[ERROR] lsmod not available`。
+SuSFS 会把自身模块从 `lsmod` 里隐藏，所以这里不问 `lsmod`，而是执行
+`ksu_susfs show version`：成功即视为可用。`ksu_susfs` 不存在时返回 `false`，
+退出码 1，stderr 里是 `[ERROR] ksu_susfs not found: …`。
 
 ### 5.2 `status susfs_version`
 
@@ -144,7 +146,7 @@ ko_size=482304
 | `android_version` | string         | `ro.build.version.release`，取不到为 `unknown` |
 | `kernel_version`  | string         | 内核主次版本，如 `6.1`                         |
 | `gki_branch`      | string         | `uname -r` 里的 `-androidNN-`，取不到为空串    |
-| `loaded`          | `true`/`false` | `lsmod` 中是否存在 `susfs_guard_lkm`           |
+| `loaded`          | `true`/`false` | `ksu_susfs show version` 是否成功              |
 | `reboot_required` | `true`/`false` | 重启标记文件是否存在                           |
 | `running_version` | string         | `ksu_susfs show version`，去 `v` 前缀          |
 | `local_version`   | string         | 已安装的上游 tag，取不到为 `unknown`           |

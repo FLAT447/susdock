@@ -16,7 +16,6 @@ fi
 DATA_DIR="/data/adb/$(basename "${MODDIR}")"
 KO_FILE="${DATA_DIR}/mod/susfs_guard_lkm.ko"
 LOG_FILE="${DATA_DIR}/logs/module.log"
-MODULE_NAME="susfs_guard_lkm"
 
 # 更新程序写入固定的 susfs_guard_lkm.ko；手动放进来的文件可能保留上游
 # 资产名（susfs_guard_lkm-android15-6.6.ko），这种情况下取目录里的第一个。
@@ -51,8 +50,12 @@ log() {
     exit 0
 }
 
-# 重复 insmod 会报 File exists，先看一眼是否已加载。lsmod 可以直接运行。
-if lsmod 2> /dev/null | grep -q "^${MODULE_NAME} "; then
+# 重复 insmod 会报 File exists。SuSFS 会把自身模块从 lsmod 里隐藏，
+# 所以直接用 ksu_susfs 是否响应来判断。
+KSU_SUSFS_BIN=$(command -v ksu_susfs 2> /dev/null)
+[ -n "${KSU_SUSFS_BIN}" ] || KSU_SUSFS_BIN="/data/adb/ksu/bin/ksu_susfs"
+
+if [ -x "${KSU_SUSFS_BIN}" ] && "${KSU_SUSFS_BIN}" show version > /dev/null 2>&1; then
     log "susfs: already loaded"
     exit 0
 fi

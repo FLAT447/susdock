@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # 模块脚本的回归测试。不需要真机：把 src/module 复制到临时目录，
-# 把 /data/adb 换成临时路径，再用假 lsmod / insmod 驱动分支。
+# 把 /data/adb 换成临时路径，再用假 ksud / ksu_susfs 驱动分支。
 #
 # 运行：bash tests/run.sh
 
@@ -49,9 +49,10 @@ setup() {
     cp -r "$ROOT/src/module" "$T/module"
     find "$T/module" -name '*.sh' -exec sed -i "s#/data/adb/#$T/data/#g" {} +
     mkdir -p "$T/bin" "$T/data/module/mod"
-    printf '#!/bin/sh\nexit 0\n' > "$T/bin/lsmod"
+    # ksud 负责加载；ksu_susfs 默认失败，表示当前内核还没有 SuSFS
     printf '#!/bin/sh\nexit 0\n' > "$T/bin/ksud"
-    chmod +x "$T/bin/lsmod" "$T/bin/ksud"
+    printf '#!/bin/sh\nexit 1\n' > "$T/bin/ksu_susfs"
+    chmod +x "$T/bin/ksud" "$T/bin/ksu_susfs"
 }
 
 teardown() {
@@ -111,19 +112,45 @@ test_boot_script_paths() {
 
     # 已加载时跳过，并保留重启标记
     : > "$T/data/module/mod/reboot"
-    printf '#!/bin/sh\necho "susfs_guard_lkm 1 0"\n' > "$T/bin/lsmod"
-    chmod +x "$T/bin/lsmod"
+    printf '#!/bin/sh\necho v1.0\n' > "$T/bin/ksu_susfs"
+    chmod +x "$T/bin/ksu_susfs"
     out=$(PATH="$T/bin:$PATH" bash "$T/data/post-fs-data.d/module.sh" 2>&1)
     assert_contains "$out" "already loaded" "已加载时应跳过"
     assert_exists "$T/data/module/mod/reboot" "跳过时不应清除重启标记"
 
     # ksud insmod 失败时返回 1，保留标记
-    printf '#!/bin/sh\nexit 0\n' > "$T/bin/lsmod"
+    printf '#!/bin/sh\nexit 1\n' > "$T/bin/ksu_susfs"
     printf '#!/bin/sh\nexit 1\n' > "$T/bin/ksud"
-    chmod +x "$T/bin/lsmod" "$T/bin/ksud"
+    chmod +x "$T/bin/ksu_susfs" "$T/bin/ksud"
     PATH="$T/bin:$PATH" bash "$T/data/post-fs-data.d/module.sh" > /dev/null 2>&1
     assert_eq "$?" "1" "ksud insmod 失败应返回 1"
     assert_exists "$T/data/module/mod/reboot" "失败时不应清除重启标记"
+
+    teardown
+}
+
+test_status_installed_uses_ksu_susfs() {
+    setup
+    mkdir -p "$T/data/ksu/bin"
+    printf '#!/bin/sh\necho v1.0\n' > "$T/data/ksu/bin/ksu_susfs"
+    chmod +x "$T/data/ksu/bin/ksu_susfs"
+
+    out=$(mod_call "
+        . \"\$MODDIR/entries/status.sh\"
+        status_installed
+        echo rc=\$?
+    ")
+    assert_contains "$out" "true" "ksu_susfs 可用时应显示已加载"
+    assert_contains "$out" "rc=0" "已加载应返回 0"
+
+    # ksu_susfs 不可用时回到 false
+    printf '#!/bin/sh\nexit 1\n' > "$T/data/ksu/bin/ksu_susfs"
+    out=$(mod_call "
+        . \"\$MODDIR/entries/status.sh\"
+        status_installed
+        echo rc=\$?
+    ")
+    assert_contains "$out" "false" "ksu_susfs 不可用时应显示未加载"
 
     teardown
 }
@@ -293,6 +320,7 @@ test_uninstall_cleanup() {
 for test in \
     test_autoload_toggle \
     test_boot_script_paths \
+    test_status_installed_uses_ksu_susfs \
     test_boot_script_requires_ksud \
     test_boot_script_custom_ko_name \
     test_boot_script_respects_disable \
