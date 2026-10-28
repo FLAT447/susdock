@@ -33,7 +33,7 @@ export class SdAutoloadCard extends HTMLElement {
         }
         catch (error) {
             toggle.checked = false;
-            this.meta().textContent = `读取失败：${messageOf(error)}`;
+            this.meta().textContent = `读取失败：${this.describe(error)}`;
         }
     }
 
@@ -55,7 +55,7 @@ export class SdAutoloadCard extends HTMLElement {
         }
         catch (error) {
             toggle.checked = !wanted;
-            const message = messageOf(error);
+            const message = this.describe(error);
             this.meta().textContent = `切换失败：${message}`;
             notify(`切换失败：${message}`);
         }
@@ -63,6 +63,14 @@ export class SdAutoloadCard extends HTMLElement {
             toggle.disabled = false;
             this.busy = false;
         }
+    }
+
+    // entry.sh 在模块被禁用时统一报 "module is disabled"，这里换成可读提示
+    private describe(error: unknown): string {
+        const message = messageOf(error);
+        return message.includes("module is disabled")
+            ? "模块已被禁用，无法修改开机加载。"
+            : message;
     }
 
     private setMeta(enabled: boolean): void {
