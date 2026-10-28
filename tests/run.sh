@@ -215,6 +215,21 @@ test_check_api_error() {
     teardown
 }
 
+test_check_non_json_response() {
+    setup
+    printf '<html><body>rate limited</body></html>' > "$T/fake.json"
+
+    out=$(mod_call "
+        download() { cp '$T/fake.json' \"\$2\"; }
+        mod_check
+        echo rc=\$?
+    ")
+    assert_contains "$out" "rc=2" "非 JSON 响应应返回 2"
+    assert_contains "$(cat "$T/stderr.log")" "response:" "应输出响应片段"
+
+    teardown
+}
+
 test_update_refreshes_boot_script() {
     setup
     printf 'payload\n' > "$T/payload.ko"
@@ -285,6 +300,7 @@ for test in \
     test_check_versions \
     test_minified_json \
     test_check_api_error \
+    test_check_non_json_response \
     test_update_refreshes_boot_script \
     test_customize_refresh \
     test_uninstall_cleanup; do

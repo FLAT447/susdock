@@ -116,10 +116,15 @@ _us_resolve() {
     _RV=$(_json_get "$_tmp" "tag_name")
     [ -n "$_RV" ] || {
         # GitHub returns {"message": "..."} for errors such as rate limiting.
-        # Show it so the log says why parsing failed.
+        # Without a message the body is probably not JSON at all, so show a
+        # snippet at ERROR level: DEBUG is hidden by the default log level.
         _msg=$(_json_get "$_tmp" "message")
-        log ERROR "cannot parse tag_name${_msg:+ (upstream: $_msg)}"
-        log DEBUG "upstream response: $(head -c 200 "$_tmp" 2> /dev/null | tr '\n' ' ')"
+        if [ -n "$_msg" ]; then
+            log ERROR "cannot parse tag_name (upstream: $_msg)"
+        else
+            _snip=$(head -c 80 "$_tmp" 2> /dev/null | tr '\n' ' ')
+            log ERROR "cannot parse tag_name (response: $_snip)"
+        fi
         rm -f "$_tmp"
         return "$US_ERR_PARSE"
     }
