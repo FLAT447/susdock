@@ -26,6 +26,10 @@ release_json() {
     _json_file="${DATA_DIR}/release.$$.json"
     mkdir -p "$DATA_DIR" 2> /dev/null
 
+    # Normal paths below delete the file; the trap also covers a signal or an
+    # early exit so the release JSON never stays behind.
+    trap 'rm -f "$_json_file"' EXIT HUP INT TERM
+
     download "$UPSTREAM_API" "$_json_file" || {
         log ERROR "failed to fetch release info"
         rm -f "$_json_file"
