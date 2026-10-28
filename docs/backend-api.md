@@ -276,23 +276,28 @@ official=https://api.github.com/repos/inforcqb/susfs4ksu-lkm/releases/latest
 
 ### 5.14 `mod autoload`
 
-控制开机时是否优先加载已安装的驱动。开关状态就是
+控制开机时用哪种方式加载已安装的驱动。开关状态就是
 `/data/adb/post-fs-data.d/<id>.sh` 是否存在，不写配置文件。
+
+- 关闭（默认）：模块目录的 `post-fs-data.sh` 由 KernelSU 执行。
+- 开启：先把脚本复制到 `post-fs-data.d/<id>.sh`，再把模块里的
+  `post-fs-data.sh` 改名为 `.post-fs-data.sh`，避免同一脚本执行两次。
+- 关闭：删除副本，把 `.post-fs-data.sh` 改回 `post-fs-data.sh`。
 
 ```
 sh entry.sh mod autoload        # 读取状态
 stdout: enabled=true | enabled=false
 
-sh entry.sh mod autoload on     # 复制脚本，chmod 755
-sh entry.sh mod autoload off    # 删除脚本
+sh entry.sh mod autoload on     # 安装优先副本并隐藏自带脚本
+sh entry.sh mod autoload off    # 删除副本并恢复自带脚本
 stdout: enabled=true | enabled=false
 ```
 
-| 退出码 | 含义                   |
-| ------ | ---------------------- |
-| `0`    | 成功                   |
-| `1`    | 参数不是 `on` / `off`  |
-| `4`    | 复制、chmod 或删除失败 |
+| 退出码 | 含义                         |
+| ------ | ---------------------------- |
+| `0`    | 成功                         |
+| `1`    | 参数不是 `on` / `off`        |
+| `4`    | 复制、改名、chmod 或删除失败 |
 
 卸载模块时 `uninstall.sh` 会删掉这个脚本，避免残留。
 

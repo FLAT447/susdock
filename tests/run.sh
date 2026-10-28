@@ -77,11 +77,18 @@ test_autoload_toggle() {
     setup
 
     assert_eq "$(mod_call 'mod_autoload')" "enabled=false" "初始状态应为关闭"
+    assert_exists "$T/module/post-fs-data.sh" "默认应有模块自带的脚本"
+
     assert_eq "$(mod_call 'mod_autoload on')" "enabled=true" "开启后状态应为开"
-    assert_exists "$T/data/post-fs-data.d/module.sh" "开启后应写入副本"
+    assert_exists "$T/data/post-fs-data.d/module.sh" "开启后应写入优先副本"
+    assert_missing "$T/module/post-fs-data.sh" "开启后应隐藏模块自带的脚本"
+    assert_exists "$T/module/.post-fs-data.sh" "开启后应保留隐藏文件"
+
     assert_eq "$(mod_call 'mod_autoload')" "enabled=true" "开启后读取状态"
     assert_eq "$(mod_call 'mod_autoload off')" "enabled=false" "关闭后状态应为关"
-    assert_missing "$T/data/post-fs-data.d/module.sh" "关闭后应删除副本"
+    assert_missing "$T/data/post-fs-data.d/module.sh" "关闭后应删除优先副本"
+    assert_exists "$T/module/post-fs-data.sh" "关闭后应恢复模块脚本"
+    assert_missing "$T/module/.post-fs-data.sh" "关闭后不应保留隐藏文件"
 
     mod_call 'mod_autoload maybe' > /dev/null
     assert_eq "$?" "1" "非法参数应返回 1"
@@ -126,7 +133,7 @@ test_boot_script_respects_disable() {
     : > "$T/data/module/mod/susfs_guard_lkm.ko"
     : > "$T/module/disable"
 
-    out=$(PATH="$T/bin:$PATH" bash "$T/module/autoload.sh" 2>&1)
+    out=$(PATH="$T/bin:$PATH" bash "$T/module/post-fs-data.sh" 2>&1)
     rc=$?
     assert_contains "$out" "module is disabled" "模块禁用时应跳过"
     assert_eq "$rc" "0" "禁用时退出码应为 0"
@@ -232,10 +239,12 @@ test_customize_refresh() {
     MODPATH="$T/module" bash "$T/module/customize.sh" > /dev/null 2>&1
     assert_missing "$T/data/post-fs-data.d/susdock.sh" "未开启时不应创建"
 
-    # 开关已开启：覆盖旧副本
+    # 开关已开启：覆盖旧副本，并隐藏模块自带的脚本
     printf 'OLD\n' > "$T/data/post-fs-data.d/susdock.sh"
     MODPATH="$T/module" bash "$T/module/customize.sh" > /dev/null 2>&1
     assert_contains "$(head -1 "$T/data/post-fs-data.d/susdock.sh")" "#!/system/bin/sh" "安装后应覆盖副本"
+    assert_missing "$T/module/post-fs-data.sh" "开启时应隐藏模块脚本"
+    assert_exists "$T/module/.post-fs-data.sh" "开启时应保留隐藏文件"
 
     teardown
 }

@@ -1,7 +1,8 @@
 #!/system/bin/sh
 
-# WebUI 的开关会把本脚本复制到 /data/adb/post-fs-data.d/<id>.sh，
-# KernelSU 在 post-fs-data 阶段执行它。
+# 默认由 KernelSU 执行模块目录里的本脚本。
+# WebUI 开启「开机优先加载」后，本脚本会被重命名为 .post-fs-data.sh，
+# 并复制到 /data/adb/post-fs-data.d/<id>.sh，由后者优先执行。
 # 故意不 source lib/*.sh：启动路径必须独立，辅助脚本出错也不能拖住开机。
 # 日志直接追加到模块日志，格式与 lib/log.sh 保持一致。
 

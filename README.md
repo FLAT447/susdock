@@ -7,7 +7,7 @@ SuSFS 的 LKM 管理器，跑在 KernelSU 上。不在本地编内核模块，�
 - 查 [inforcqb/susfs4ksu-lkm](https://github.com/inforcqb/susfs4ksu-lkm) 的最新发布
 - 按 `<Android 版本>-<内核版本>` 选对应的 `.ko`，sha256 对得上才写进 `/data/adb/susdock/mod/`
 - 装完留下重启标记，重启后生效
-- WebUI 里可开关「开机优先加载」：开启后把加载脚本写入 `/data/adb/post-fs-data.d/`，卸载模块时自动清理
+- WebUI 里可开关「开机优先加载」：默认用模块自带的 `post-fs-data.sh`；开启后改为 `/data/adb/post-fs-data.d/` 优先执行，并隐藏自带的脚本
 - 自带 WebUI：看状态、查更新、翻日志（可倒序）、清日志、调等级、换更新源
 
 ## 要求
