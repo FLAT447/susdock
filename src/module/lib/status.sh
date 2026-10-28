@@ -4,17 +4,18 @@
 ST_ERR_TOOL=1
 ST_ERR_VERSION=2
 
-# Check if susfs module is loaded via lsmod
+# Check whether SuSFS is available in the running kernel.
+# SuSFS hides its own module from lsmod, so asking ksu_susfs is the only
+# reliable check. A non-zero exit means the kernel does not have it enabled.
 # Usage: susfs_installed
-# Returns 0 if loaded, 1 if not loaded, >1 on error
+# Returns 0 if available, 1 if not, >1 when ksu_susfs is missing
 susfs_installed() {
-    command -v lsmod > /dev/null 2>&1 || {
-        log ERROR "lsmod not available"
+    [ -x "$SUSFS_KSU_SUSFS_BIN" ] || {
+        log ERROR "ksu_susfs not found: $SUSFS_KSU_SUSFS_BIN"
         return "$ST_ERR_TOOL"
     }
 
-    lsmod | grep -q "^${SUSFS_MODULE_NAME} " && return 0
-    return 1
+    "$SUSFS_KSU_SUSFS_BIN" show version > /dev/null 2>&1
 }
 
 # Get running susfs version from ksu_susfs
@@ -27,13 +28,13 @@ susfs_version() {
         return "$ST_ERR_TOOL"
     }
 
-    _raw=$("$SUSFS_KSU_SUSFS_BIN" show version 2> /dev/null)
-    [ -n "$_raw" ] || {
+    _sv_raw=$("$SUSFS_KSU_SUSFS_BIN" show version 2> /dev/null)
+    [ -n "$_sv_raw" ] || {
         log ERROR "failed to get susfs version"
         return "$ST_ERR_VERSION"
     }
 
-    echo "${_raw#v}"
+    echo "${_sv_raw#v}"
     return 0
 }
 
@@ -54,13 +55,13 @@ android_version() {
         return "$ST_ERR_TOOL"
     }
 
-    _ver=$(getprop ro.build.version.release 2> /dev/null)
-    [ -n "$_ver" ] || {
+    _av_ver=$(getprop ro.build.version.release 2> /dev/null)
+    [ -n "$_av_ver" ] || {
         log ERROR "failed to get android version"
         return "$ST_ERR_VERSION"
     }
 
-    echo "$_ver"
+    echo "$_av_ver"
     return 0
 }
 
@@ -74,13 +75,13 @@ kernel_version() {
         return "$ST_ERR_TOOL"
     }
 
-    _raw=$(uname -r 2> /dev/null)
-    [ -n "$_raw" ] || {
+    _kv_raw=$(uname -r 2> /dev/null)
+    [ -n "$_kv_raw" ] || {
         log ERROR "failed to get kernel version"
         return "$ST_ERR_VERSION"
     }
 
     # "5.15.77-perf" -> "5.15"
-    echo "$_raw" | awk -F. '{print $1"."$2}'
+    echo "$_kv_raw" | awk -F. '{print $1"."$2}'
     return 0
 }

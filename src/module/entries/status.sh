@@ -38,49 +38,40 @@ status_reboot_required() {
 # Usage: status_quick
 # Outputs key=value lines to stdout
 status_quick() {
-    _android=$(android_version 2> /dev/null || echo "unknown")
-    _kernel=$(kernel_version 2> /dev/null || echo "unknown")
+    _st_android=$(android_version 2> /dev/null || echo "unknown")
+    _st_kernel=$(kernel_version 2> /dev/null || echo "unknown")
+    # GKI 分支来自 uname 的 -androidNN- 标记，选择上游资产时优先用它
+    _st_gki=$(android_kernel_version 2> /dev/null || echo "")
 
     if susfs_installed; then
-        _loaded="true"
+        _st_loaded="true"
     else
-        _loaded="false"
+        _st_loaded="false"
     fi
 
     if [ -f "$REBOOT_FLAG" ]; then
-        _reboot="true"
+        _st_reboot="true"
     else
-        _reboot="false"
+        _st_reboot="false"
     fi
 
-    _running=$(susfs_version 2> /dev/null || echo "unknown")
-    _local=$(get_local_version 2> /dev/null || echo "unknown")
+    _st_running=$(susfs_version 2> /dev/null || echo "unknown")
+    _st_local=$(get_local_version 2> /dev/null || echo "unknown")
 
-    _size=0
+    _st_size=0
     if [ -f "$UPSTREAM_LOCAL_TARGET" ]; then
-        _size=$(wc -c < "$UPSTREAM_LOCAL_TARGET" 2> /dev/null | tr -d '[:space:]')
+        _st_size=$(wc -c < "$UPSTREAM_LOCAL_TARGET" 2> /dev/null | tr -d '[:space:]')
     fi
-    [ -n "$_size" ] || _size=0
+    [ -n "$_st_size" ] || _st_size=0
 
-    echo "android_version=$_android"
-    echo "kernel_version=$_kernel"
-    echo "loaded=$_loaded"
-    echo "reboot_required=$_reboot"
-    echo "running_version=$_running"
-    echo "local_version=$_local"
-    echo "ko_size=$_size"
-    return 0
-}
-
-# Get summary info including the remote version. This performs a network
-# request, so it can take a while on a slow connection.
-# Usage: status_info
-# Outputs key=value lines to stdout
-status_info() {
-    status_quick
-
-    _remote=$(get_remote_version 2> /dev/null || echo "unknown")
-    echo "remote_version=$_remote"
+    echo "android_version=$_st_android"
+    echo "kernel_version=$_st_kernel"
+    echo "gki_branch=$_st_gki"
+    echo "loaded=$_st_loaded"
+    echo "reboot_required=$_st_reboot"
+    echo "running_version=$_st_running"
+    echo "local_version=$_st_local"
+    echo "ko_size=$_st_size"
     return 0
 }
 
@@ -94,7 +85,6 @@ status_dispatch() {
         susfs_version) status_susfs_version "$@" ;;
         reboot_required) status_reboot_required "$@" ;;
         quick) status_quick "$@" ;;
-        info) status_info "$@" ;;
         *) err "unknown status subcommand: ${_sub:-<empty>}" ;;
     esac
 }

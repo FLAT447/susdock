@@ -493,15 +493,19 @@ sd-log-panel .log {
     font-size: 13px;
 }
 
-/* 加载指示器用伪元素，避免在 HTML 里塞多余节点 */
-.btn.busy::before {
+/* 加载指示器：只让 SVG 的 path 转，外层按钮保持不动 */
+.btn .spinner {
+    flex: none;
+    fill: currentColor;
+    width: 16px;
+    height: 16px;
+    color: inherit;
+}
+
+.btn.busy .spinner path {
+    transform-box: fill-box;
+    transform-origin: center;
     animation: spin 0.8s linear infinite;
-    border: 2px solid rgb(255 255 255 / 0.35);
-    border-top-color: #fff;
-    border-radius: 50%;
-    width: 13px;
-    height: 13px;
-    content: "";
 }
 
 @keyframes spin {

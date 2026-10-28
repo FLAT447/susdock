@@ -26,7 +26,6 @@ UPSTREAM_MIRROR=""                                                              
 UPSTREAM_VERSION_FILE="${MOD_DIR}/version"                                            # File to store the current version of the module
 UPSTREAM_LOCAL_TARGET="${MOD_DIR}/susfs_guard_lkm.ko"                                 # Local target file path for the downloaded kernel module
 : "SUSFS"                                                                             #
-SUSFS_MODULE_NAME="susfs_guard_lkm"                                                   # Kernel module name in lsmod
 SUSFS_KSU_SUSFS_BIN="/data/adb/ksu/bin/ksu_susfs"                                     # Path to the ksu_susfs binary
 : "REBOOT"                                                                            #
 REBOOT_FLAG="${MOD_DIR}/reboot"                                                       # Flag file to indicate that a reboot is required after module update
@@ -57,25 +56,25 @@ _upstream_url_valid() {
 # Usage: config_set <key> <value>
 # Returns 0 on success, 1 on failure.
 config_set() {
-    _key="$1"
-    _value="$2"
+    _cfg_key="$1"
+    _cfg_value="$2"
 
     mkdir -p "$DATA_DIR" 2> /dev/null || return 1
 
-    _tmp="${CONFIG_FILE}.tmp.$$"
+    _cfg_tmp="${CONFIG_FILE}.tmp.$$"
     if [ -f "$CONFIG_FILE" ]; then
-        grep -v "^${_key}=" "$CONFIG_FILE" > "$_tmp" 2> /dev/null
+        grep -v "^${_cfg_key}=" "$CONFIG_FILE" > "$_cfg_tmp" 2> /dev/null
     else
-        : > "$_tmp"
+        : > "$_cfg_tmp"
     fi
 
-    printf '%s=%s\n' "$_key" "$_value" >> "$_tmp" || {
-        rm -f "$_tmp"
+    printf '%s=%s\n' "$_cfg_key" "$_cfg_value" >> "$_cfg_tmp" || {
+        rm -f "$_cfg_tmp"
         return 1
     }
 
-    mv "$_tmp" "$CONFIG_FILE" || {
-        rm -f "$_tmp"
+    mv "$_cfg_tmp" "$CONFIG_FILE" || {
+        rm -f "$_cfg_tmp"
         return 1
     }
 
@@ -88,9 +87,9 @@ _config_load() {
     [ -f "$CONFIG_FILE" ] || return 0
     [ -n "$LOG_LEVEL_ENV" ] && return 0
 
-    _lvl=$(sed -n 's/^LOG_LEVEL=\([A-Za-z]*\)$/\1/p' "$CONFIG_FILE" 2> /dev/null | tail -n 1)
-    case "$_lvl" in
-        DEBUG | INFO | WARN | ERROR) LOG_LEVEL="$_lvl" ;;
+    _cfg_lvl=$(sed -n 's/^LOG_LEVEL=\([A-Za-z]*\)$/\1/p' "$CONFIG_FILE" 2> /dev/null | tail -n 1)
+    case "$_cfg_lvl" in
+        DEBUG | INFO | WARN | ERROR) LOG_LEVEL="$_cfg_lvl" ;;
     esac
 
     return 0

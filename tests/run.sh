@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # 模块脚本的回归测试。不需要真机：把 src/module 复制到临时目录，
-# 把 /data/adb 换成临时路径，再用假 lsmod / insmod 驱动分支。
+# 把 /data/adb 换成临时路径，再用假 ksud / ksu_susfs 驱动分支。
 #
 # 运行：bash tests/run.sh
 
@@ -49,9 +49,10 @@ setup() {
     cp -r "$ROOT/src/module" "$T/module"
     find "$T/module" -name '*.sh' -exec sed -i "s#/data/adb/#$T/data/#g" {} +
     mkdir -p "$T/bin" "$T/data/module/mod"
-    printf '#!/bin/sh\nexit 0\n' > "$T/bin/lsmod"
-    printf '#!/bin/sh\nexit 0\n' > "$T/bin/insmod"
-    chmod +x "$T/bin/lsmod" "$T/bin/insmod"
+    # ksud 负责加载；ksu_susfs 默认失败，表示当前内核还没有 SuSFS
+    printf '#!/bin/sh\nexit 0\n' > "$T/bin/ksud"
+    printf '#!/bin/sh\nexit 1\n' > "$T/bin/ksu_susfs"
+    chmod +x "$T/bin/ksud" "$T/bin/ksu_susfs"
 }
 
 teardown() {
@@ -77,11 +78,18 @@ test_autoload_toggle() {
     setup
 
     assert_eq "$(mod_call 'mod_autoload')" "enabled=false" "初始状态应为关闭"
+    assert_exists "$T/module/post-fs-data.sh" "默认应有模块自带的脚本"
+
     assert_eq "$(mod_call 'mod_autoload on')" "enabled=true" "开启后状态应为开"
-    assert_exists "$T/data/post-fs-data.d/module.sh" "开启后应写入副本"
+    assert_exists "$T/data/post-fs-data.d/module.sh" "开启后应写入优先副本"
+    assert_missing "$T/module/post-fs-data.sh" "开启后应隐藏模块自带的脚本"
+    assert_exists "$T/module/.post-fs-data.sh" "开启后应保留隐藏文件"
+
     assert_eq "$(mod_call 'mod_autoload')" "enabled=true" "开启后读取状态"
     assert_eq "$(mod_call 'mod_autoload off')" "enabled=false" "关闭后状态应为关"
-    assert_missing "$T/data/post-fs-data.d/module.sh" "关闭后应删除副本"
+    assert_missing "$T/data/post-fs-data.d/module.sh" "关闭后应删除优先副本"
+    assert_exists "$T/module/post-fs-data.sh" "关闭后应恢复模块脚本"
+    assert_missing "$T/module/.post-fs-data.sh" "关闭后不应保留隐藏文件"
 
     mod_call 'mod_autoload maybe' > /dev/null
     assert_eq "$?" "1" "非法参数应返回 1"
@@ -104,19 +112,69 @@ test_boot_script_paths() {
 
     # 已加载时跳过，并保留重启标记
     : > "$T/data/module/mod/reboot"
-    printf '#!/bin/sh\necho "susfs_guard_lkm 1 0"\n' > "$T/bin/lsmod"
-    chmod +x "$T/bin/lsmod"
+    printf '#!/bin/sh\necho v1.0\n' > "$T/bin/ksu_susfs"
+    chmod +x "$T/bin/ksu_susfs"
     out=$(PATH="$T/bin:$PATH" bash "$T/data/post-fs-data.d/module.sh" 2>&1)
     assert_contains "$out" "already loaded" "已加载时应跳过"
     assert_exists "$T/data/module/mod/reboot" "跳过时不应清除重启标记"
 
-    # insmod 失败时返回 1，保留标记
-    printf '#!/bin/sh\nexit 0\n' > "$T/bin/lsmod"
-    printf '#!/bin/sh\nexit 1\n' > "$T/bin/insmod"
-    chmod +x "$T/bin/lsmod" "$T/bin/insmod"
+    # ksud insmod 失败时返回 1，保留标记
+    printf '#!/bin/sh\nexit 1\n' > "$T/bin/ksu_susfs"
+    printf '#!/bin/sh\nexit 1\n' > "$T/bin/ksud"
+    chmod +x "$T/bin/ksu_susfs" "$T/bin/ksud"
     PATH="$T/bin:$PATH" bash "$T/data/post-fs-data.d/module.sh" > /dev/null 2>&1
-    assert_eq "$?" "1" "insmod 失败应返回 1"
+    assert_eq "$?" "1" "ksud insmod 失败应返回 1"
     assert_exists "$T/data/module/mod/reboot" "失败时不应清除重启标记"
+
+    teardown
+}
+
+test_status_installed_uses_ksu_susfs() {
+    setup
+    mkdir -p "$T/data/ksu/bin"
+    printf '#!/bin/sh\necho v1.0\n' > "$T/data/ksu/bin/ksu_susfs"
+    chmod +x "$T/data/ksu/bin/ksu_susfs"
+
+    out=$(mod_call "
+        . \"\$MODDIR/entries/status.sh\"
+        status_installed
+        echo rc=\$?
+    ")
+    assert_contains "$out" "true" "ksu_susfs 可用时应显示已加载"
+    assert_contains "$out" "rc=0" "已加载应返回 0"
+
+    # ksu_susfs 不可用时回到 false
+    printf '#!/bin/sh\nexit 1\n' > "$T/data/ksu/bin/ksu_susfs"
+    out=$(mod_call "
+        . \"\$MODDIR/entries/status.sh\"
+        status_installed
+        echo rc=\$?
+    ")
+    assert_contains "$out" "false" "ksu_susfs 不可用时应显示未加载"
+
+    teardown
+}
+
+test_boot_script_requires_ksud() {
+    setup
+    : > "$T/data/module/mod/susfs_guard_lkm.ko"
+    rm -f "$T/bin/ksud"
+
+    out=$(PATH="$T/bin:/usr/bin:/bin" bash "$T/module/post-fs-data.sh" 2>&1)
+    rc=$?
+    assert_contains "$out" "ksud not found" "缺少 ksud 时应提示"
+    assert_eq "$rc" "1" "缺少 ksud 应返回 1"
+
+    teardown
+}
+
+test_boot_script_custom_ko_name() {
+    setup
+    : > "$T/data/module/mod/susfs_guard_lkm-android15-6.6.ko"
+
+    out=$(PATH="$T/bin:$PATH" bash "$T/module/post-fs-data.sh" 2>&1)
+    assert_contains "$out" "susfs: loaded" "任意名字的 .ko 也应加载"
+    assert_contains "$out" "susfs_guard_lkm-android15-6.6.ko" "日志应带上实际文件名"
 
     teardown
 }
@@ -126,7 +184,7 @@ test_boot_script_respects_disable() {
     : > "$T/data/module/mod/susfs_guard_lkm.ko"
     : > "$T/module/disable"
 
-    out=$(PATH="$T/bin:$PATH" bash "$T/module/autoload.sh" 2>&1)
+    out=$(PATH="$T/bin:$PATH" bash "$T/module/post-fs-data.sh" 2>&1)
     rc=$?
     assert_contains "$out" "module is disabled" "模块禁用时应跳过"
     assert_eq "$rc" "0" "禁用时退出码应为 0"
@@ -134,83 +192,65 @@ test_boot_script_respects_disable() {
     teardown
 }
 
-test_check_first_install() {
+test_release_json() {
     setup
-    cat > "$T/fake.json" << 'JSON'
-{"tag_name":"v1.5.3","assets":[]}
-JSON
+    printf '{"tag_name":"v1.5.3","assets":[]}' > "$T/fake.json"
 
     out=$(mod_call "
         download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
+        release_json
     ")
-    assert_contains "$out" "v1.5.3" "首次安装应返回远端版本"
-    assert_contains "$out" "rc=0" "首次安装应返回 0"
-    assert_contains "$(cat "$T/stderr.log")" "nothing installed yet" "首次安装不应报错"
+    assert_contains "$out" '"tag_name":"v1.5.3"' "release_json 应原样输出 JSON"
+    assert_eq "$(ls "$T/data/module"/release.*.json 2> /dev/null | wc -l | tr -d ' ')" "0" "临时文件应删除"
 
     teardown
 }
 
-test_check_versions() {
+test_release_json_scratch_collision() {
     setup
-    cat > "$T/fake.json" << 'JSON'
-{"tag_name":"v1.5.3","assets":[]}
-JSON
+    printf '{"tag_name":"v1.5.3","assets":[]}' > "$T/fake.json"
 
-    printf 'v1.5.3\n' > "$T/data/module/mod/version"
+    # download() 会用 _tmp 做自己的临时文件，这里模拟同样的行为
     out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
+        download() {
+            _tmp=\"\$2.tmp.\$\$\"
+            cp '$T/fake.json' \"\$_tmp\"
+            mv \"\$_tmp\" \"\$2\"
+        }
+        release_json
     ")
-    assert_contains "$out" "rc=1" "同版本应返回 1"
-
-    printf 'v1.5.2\n' > "$T/data/module/mod/version"
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
-    ")
-    assert_contains "$out" "v1.5.3" "旧版本应返回远端版本"
-    assert_contains "$out" "rc=0" "旧版本应返回 0"
+    assert_contains "$out" '"tag_name":"v1.5.3"' "download 的临时变量不应影响输出"
 
     teardown
 }
 
-test_minified_json() {
+test_release_failure() {
     setup
-    printf '{"tag_name":"v1.5.3","assets":[{"name":"a.ko","digest":"sha256:abc","browser_download_url":"https://example.invalid/x.ko"}]}' > "$T/fake.json"
 
     out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        get_remote_version
+        download() { return 4; }
+        release_json
+        echo rc=\$?
     ")
-    assert_contains "$out" "v1.5.3" "压缩 JSON 应能解析 tag"
-
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        get_remote_urls
-    ")
-    assert_contains "$out" "https://example.invalid/x.ko" "压缩 JSON 应能提取 URL"
-
-    out=$(mod_call "_json_asset '$T/fake.json' 'a.ko'")
-    assert_contains "$out" "https://example.invalid/x.ko|abc" "压缩 JSON 应能匹配 asset"
+    assert_contains "$out" "rc=6" "下载失败应返回 6"
 
     teardown
 }
 
-test_check_api_error() {
+test_update_requires_args() {
     setup
-    printf '{"message":"API rate limit exceeded"}' > "$T/fake.json"
 
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
-    ")
-    assert_contains "$out" "rc=2" "上游错误 JSON 应返回 2"
-    assert_contains "$(cat "$T/stderr.log")" "API rate limit exceeded" "应带出上游的错误信息"
+    out=$(mod_call "mod_update; echo rc=\$?")
+    assert_contains "$out" "rc=1" "缺少参数应返回 1"
+
+    teardown
+}
+
+test_update_rejects_bad_sha() {
+    setup
+
+    out=$(mod_call "mod_update v1 'https://example.invalid/x.ko' 'not-a-sha'; echo rc=\$?")
+    assert_contains "$out" "rc=3" "非法 sha256 应返回 3"
 
     teardown
 }
@@ -223,9 +263,8 @@ test_update_refreshes_boot_script() {
     printf 'OLD\n' > "$T/data/post-fs-data.d/module.sh"
 
     mod_call "
-        get_remote() { echo 'v9.9.9|$SHA|https://example.invalid/x.ko'; }
         download() { cp '$T/payload.ko' \"\$2\"; }
-        mod_update
+        mod_update v9.9.9 'https://example.invalid/x.ko' '$SHA'
     " > /dev/null
 
     assert_contains "$(head -1 "$T/data/post-fs-data.d/module.sh")" "#!/system/bin/sh" "更新后应刷新副本"
@@ -233,9 +272,8 @@ test_update_refreshes_boot_script() {
     # 开关关闭时不创建副本
     rm -f "$T/data/post-fs-data.d/module.sh"
     mod_call "
-        get_remote() { echo 'v9.9.9|$SHA|https://example.invalid/x.ko'; }
         download() { cp '$T/payload.ko' \"\$2\"; }
-        mod_update
+        mod_update v9.9.9 'https://example.invalid/x.ko' '$SHA'
     " > /dev/null
     assert_missing "$T/data/post-fs-data.d/module.sh" "开关关闭时不应创建副本"
 
@@ -252,10 +290,12 @@ test_customize_refresh() {
     MODPATH="$T/module" bash "$T/module/customize.sh" > /dev/null 2>&1
     assert_missing "$T/data/post-fs-data.d/susdock.sh" "未开启时不应创建"
 
-    # 开关已开启：覆盖旧副本
+    # 开关已开启：覆盖旧副本，并隐藏模块自带的脚本
     printf 'OLD\n' > "$T/data/post-fs-data.d/susdock.sh"
     MODPATH="$T/module" bash "$T/module/customize.sh" > /dev/null 2>&1
     assert_contains "$(head -1 "$T/data/post-fs-data.d/susdock.sh")" "#!/system/bin/sh" "安装后应覆盖副本"
+    assert_missing "$T/module/post-fs-data.sh" "开启时应隐藏模块脚本"
+    assert_exists "$T/module/.post-fs-data.sh" "开启时应保留隐藏文件"
 
     teardown
 }
@@ -280,11 +320,15 @@ test_uninstall_cleanup() {
 for test in \
     test_autoload_toggle \
     test_boot_script_paths \
+    test_status_installed_uses_ksu_susfs \
+    test_boot_script_requires_ksud \
+    test_boot_script_custom_ko_name \
     test_boot_script_respects_disable \
-    test_check_first_install \
-    test_check_versions \
-    test_minified_json \
-    test_check_api_error \
+    test_release_json \
+    test_release_json_scratch_collision \
+    test_release_failure \
+    test_update_requires_args \
+    test_update_rejects_bad_sha \
     test_update_refreshes_boot_script \
     test_customize_refresh \
     test_uninstall_cleanup; do

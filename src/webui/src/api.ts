@@ -14,6 +14,7 @@ export type LogLevel = "DEBUG" | "ERROR" | "INFO" | "WARN";
 
 export interface ModuleStatus {
     android: string;
+    gkiBranch: string;
     kernel: string;
     koSize: number;
     loaded: boolean;
@@ -22,8 +23,14 @@ export interface ModuleStatus {
     running: string;
 }
 
+export interface PendingUpdate {
+    sha256: string;
+    url: string;
+    version: string;
+}
+
 export type UpdateCheck =
-    | { state: "available"; version: string }
+    | { state: "available"; update: PendingUpdate }
     | { state: "current"; version: string }
     | { state: "error"; message: string };
 
@@ -31,6 +38,17 @@ export interface UpdateResult {
     errno: number;
     log: string;
     ok: boolean;
+}
+
+interface ReleaseAsset {
+    digest: string;
+    name: string;
+    url: string;
+}
+
+interface Release {
+    assets: ReleaseAsset[];
+    tag: string;
 }
 
 interface ExecOutput {
@@ -116,6 +134,7 @@ export async function readStatus(): Promise<ModuleStatus> {
 
     return {
         android: first(map, "android_version", "未知"),
+        gkiBranch: first(map, "gki_branch", ""),
         kernel: first(map, "kernel_version", "未知"),
         koSize: toNumber(first(map, "ko_size", "0")),
         loaded: first(map, "loaded") === "true",
@@ -126,27 +145,94 @@ export async function readStatus(): Promise<ModuleStatus> {
 }
 
 /*
- * `mod check` 用退出码表达结果：
- *   0 → 有新版本，stdout 是上游 tag
- *   1 → 已是最新（stderr 里没有 [ERROR]）
- *   >1 → 出错
+ * 上游 JSON 由 `mod release` 原样输出，这里用 JSON.parse 解析。
+ * shell 不再参与解析，压缩/报错页/权限问题都不会伪装成「解析失败」。
  */
-export async function checkUpdate(): Promise<UpdateCheck> {
-    const { errno, stderr, stdout } = await run("mod check");
+async function fetchRelease(): Promise<Release> {
+    const raw = await runOk("mod release");
 
-    if (errno === 0) {
-        return { state: "available", version: stdout.trim() };
+    let data: unknown;
+    try {
+        data = JSON.parse(raw);
+    }
+    catch {
+        throw new Error("上游响应不是合法 JSON");
     }
 
-    if (stderr.includes("[ERROR]")) {
-        return { state: "error", message: cleanError(stderr) };
+    const body = data as { assets?: unknown; tag_name?: unknown };
+    if (typeof body.tag_name !== "string" || !Array.isArray(body.assets)) {
+        throw new TypeError("上游响应缺少 tag_name 或 assets");
     }
 
-    return { state: "current", version: "" };
+    const assets: ReleaseAsset[] = [];
+    for (const item of body.assets) {
+        if (typeof item !== "object" || item === null) {
+            continue;
+        }
+        const asset = item as { browser_download_url?: unknown; digest?: unknown; name?: unknown };
+        if (typeof asset.name !== "string" || typeof asset.browser_download_url !== "string") {
+            continue;
+        }
+        assets.push({
+            digest: typeof asset.digest === "string" ? asset.digest : "",
+            name: asset.name,
+            url: asset.browser_download_url,
+        });
+    }
+
+    return { assets, tag: body.tag_name };
 }
 
-export async function applyUpdate(): Promise<UpdateResult> {
-    const { errno, stderr, stdout } = await run("mod update");
+// 资产名形如 susfs_guard_lkm-android15-6.6.ko。优先用 uname 的 GKI 分支，
+// 取不到时退回 Android 版本主号。
+function pickAsset(release: Release, status: ModuleStatus): ReleaseAsset | null {
+    const branch = status.gkiBranch === "" ? status.android.split(".")[0] : status.gkiBranch;
+    const name = `susfs_guard_lkm-android${branch}-${status.kernel}.ko`;
+    return release.assets.find(asset => asset.name === name) ?? null;
+}
+
+function sha256Of(asset: ReleaseAsset): string {
+    return asset.digest.startsWith("sha256:") ? asset.digest.slice("sha256:".length) : "";
+}
+
+// 加速前缀只作用于 GitHub 的文件下载，和旧版 shell 的行为保持一致
+function withMirror(url: string): string {
+    const { mirror } = loadUpstream();
+    return mirror !== "" && url.startsWith("https://github.com/") ? `${mirror}${url}` : url;
+}
+
+export async function checkUpdate(): Promise<UpdateCheck> {
+    const [release, status] = await Promise.all([fetchRelease(), readStatus()]);
+
+    if (release.tag === status.local) {
+        return { state: "current", version: release.tag };
+    }
+
+    const asset = pickAsset(release, status);
+    if (asset === null) {
+        const branch = status.gkiBranch === "" ? status.android : status.gkiBranch;
+        return {
+            state: "error",
+            message: `没有匹配本机的驱动：android ${branch} / 内核 ${status.kernel}`,
+        };
+    }
+
+    const sha256 = sha256Of(asset);
+    if (sha256 === "") {
+        return { state: "error", message: "上游没有提供 sha256" };
+    }
+
+    return {
+        state: "available",
+        update: { version: release.tag, url: withMirror(asset.url), sha256 },
+    };
+}
+
+export async function applyUpdate(update: PendingUpdate): Promise<UpdateResult> {
+    const args = ["mod", "update", update.version, update.url, update.sha256]
+        .map(shellQuote)
+        .join(" ");
+    const { errno, stderr, stdout } = await run(args);
     const log = [stderr, stdout]
         .filter(part => part.trim() !== "")
         .join("\n")

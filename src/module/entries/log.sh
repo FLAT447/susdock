@@ -8,20 +8,20 @@ LOG_ERR_WRITE=2
 # a just-rotated log does not look empty.
 # Usage: log_tail [lines]
 log_tail() {
-    _n="${1:-200}"
+    _tail_n="${1:-200}"
 
-    case "$_n" in
-        '' | *[!0-9]*) _n=200 ;;
+    case "$_tail_n" in
+        '' | *[!0-9]*) _tail_n=200 ;;
     esac
-    [ "$_n" -eq 0 ] && _n=200
+    [ "$_tail_n" -eq 0 ] && _tail_n=200
 
-    _file=$(log_path)
-    _bak="${_file}.1"
+    _tail_file=$(log_path)
+    _tail_bak="${_tail_file}.1"
 
-    if [ -f "$_bak" ]; then
-        cat "$_bak" "$_file" 2> /dev/null | tail -n "$_n"
-    elif [ -f "$_file" ]; then
-        tail -n "$_n" "$_file" 2> /dev/null
+    if [ -f "$_tail_bak" ]; then
+        cat "$_tail_bak" "$_tail_file" 2> /dev/null | tail -n "$_tail_n"
+    elif [ -f "$_tail_file" ]; then
+        tail -n "$_tail_n" "$_tail_file" 2> /dev/null
     fi
 
     return 0
@@ -30,9 +30,9 @@ log_tail() {
 # Truncate the current log and drop the rotated backup.
 # Usage: log_clear_all
 log_clear_all() {
-    _file=$(log_path)
+    _clear_file=$(log_path)
     log_clear
-    rm -f "${_file}.1" 2> /dev/null
+    rm -f "${_clear_file}.1" 2> /dev/null
 
     return 0
 }
@@ -48,9 +48,9 @@ log_level_get() {
 # level is read from the config file when a command starts.
 # Usage: log_level_set <DEBUG|INFO|WARN|ERROR>
 log_level_set() {
-    _lvl=$(printf '%s' "${1:-}" | tr '[:lower:]' '[:upper:]')
+    _level_arg=$(printf '%s' "${1:-}" | tr '[:lower:]' '[:upper:]')
 
-    case "$_lvl" in
+    case "$_level_arg" in
         DEBUG | INFO | WARN | ERROR) ;;
         *)
             log ERROR "invalid log level: ${1:-<empty>}"
@@ -58,14 +58,14 @@ log_level_set() {
             ;;
     esac
 
-    config_set LOG_LEVEL "$_lvl" || {
+    config_set LOG_LEVEL "$_level_arg" || {
         log ERROR "cannot write config: $CONFIG_FILE"
         return "$LOG_ERR_WRITE"
     }
 
-    LOG_LEVEL="$_lvl"
-    log INFO "log level set to $_lvl"
-    echo "$_lvl"
+    LOG_LEVEL="$_level_arg"
+    log INFO "log level set to $_level_arg"
+    echo "$_level_arg"
     return 0
 }
 
