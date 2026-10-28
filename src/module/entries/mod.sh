@@ -6,44 +6,39 @@ MOD_ERR_DOWNLOAD=2
 MOD_ERR_HASH=3
 MOD_ERR_WRITE=4
 
-# Check if update is needed
-# Usage: mod_check
-# Outputs remote version to stdout if update needed
-# Returns 0 if update needed, 1 if up-to-date, >1 on error
-mod_check() {
-    check_update
-    _rc=$?
-
-    if [ "$_rc" -eq 0 ]; then
-        # check_update already resolved the remote tag into $_rv, so there is
-        # no need to hit the API a second time.
-        # shellcheck disable=SC2154
-        echo "$_rv"
-        return 0
-    fi
-
-    [ "$_rc" -eq 1 ] && return 1
-    return "$_rc"
-}
-
-# Download and install update (takes effect after reboot)
-# Usage: mod_update
+# Download and install an update (takes effect after reboot).
+# The WebUI parses the release JSON and passes the exact asset here, so the
+# shell never has to understand JSON.
+# Usage: mod_update <version> <url> <sha256>
 # Returns 0 on success, non-zero on failure
 mod_update() {
-    _remote=$(get_remote) || return "$MOD_ERR_CHECK"
+    _ver="${1:-}"
+    _url="${2:-}"
+    _sha="${3:-}"
 
-    # get_remote uses "|" as separator because the sha256 may be empty.
-    IFS='|' read -r _ver _sha _url << EOF
-$_remote
-EOF
-
-    [ -n "$_url" ] || {
-        log ERROR "no download URL for this device"
+    [ -n "$_ver" ] && [ -n "$_url" ] && [ -n "$_sha" ] || {
+        log ERROR "usage: mod update <version> <url> <sha256>"
         return "$MOD_ERR_CHECK"
     }
 
-    [ -n "$_sha" ] || {
-        log ERROR "no sha256 available from upstream"
+    case "$_url" in
+        https://?*) ;;
+        *)
+            log ERROR "invalid download url: $_url"
+            return "$MOD_ERR_CHECK"
+            ;;
+    esac
+
+    # Accept upper case from callers, compare in lower case like sha256sum.
+    _sha=$(printf '%s' "$_sha" | tr '[:upper:]' '[:lower:]')
+    case "$_sha" in
+        *[!0-9a-f]*)
+            log ERROR "invalid sha256"
+            return "$MOD_ERR_HASH"
+            ;;
+    esac
+    [ "${#_sha}" -eq 64 ] || {
+        log ERROR "invalid sha256"
         return "$MOD_ERR_HASH"
     }
 
@@ -154,7 +149,7 @@ mod_dispatch() {
     _sub="${1:-}"
     [ -n "$_sub" ] && shift
     case "$_sub" in
-        check) mod_check "$@" ;;
+        release) release_json "$@" ;;
         update) mod_update "$@" ;;
         version) mod_version "$@" ;;
         clear-reboot) mod_clear_reboot "$@" ;;

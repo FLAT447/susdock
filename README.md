@@ -24,13 +24,14 @@ SuSFS 的 LKM 管理器，跑在 KernelSU 上。不在本地编内核模块，�
 MODDIR=/data/adb/modules/susdock
 
 sh "$MODDIR/entry.sh" status quick        # 本机状态（不联网）
-sh "$MODDIR/entry.sh" status info         # 本机状态 + 上游版本（联网）
-sh "$MODDIR/entry.sh" mod check           # 检查更新
-sh "$MODDIR/entry.sh" mod update          # 下载并安装，重启后生效
+sh "$MODDIR/entry.sh" mod release         # 输出上游 release JSON（联网）
+sh "$MODDIR/entry.sh" mod update v2.3.0-r18.5 <url> <sha256>  # 下载并安装
 sh "$MODDIR/entry.sh" mod autoload on     # 开机自动加载（off 关闭）
 sh "$MODDIR/entry.sh" log tail 200        # 日志尾部
 sh "$MODDIR/entry.sh" log set-level DEBUG # 改日志等级
 ```
+
+`mod release` 只负责下载，JSON 由 WebUI 用 `JSON.parse` 解析；`mod update` 需要显式传版本、URL 和 sha256。
 
 参数、输出格式和退出码见 [docs/backend-api.md](docs/backend-api.md)。
 

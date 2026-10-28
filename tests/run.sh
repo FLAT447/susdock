@@ -134,98 +134,47 @@ test_boot_script_respects_disable() {
     teardown
 }
 
-test_check_first_install() {
+test_release_json() {
     setup
-    cat > "$T/fake.json" << 'JSON'
-{"tag_name":"v1.5.3","assets":[]}
-JSON
+    printf '{"tag_name":"v1.5.3","assets":[]}' > "$T/fake.json"
 
     out=$(mod_call "
         download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
+        release_json
     ")
-    assert_contains "$out" "v1.5.3" "首次安装应返回远端版本"
-    assert_contains "$out" "rc=0" "首次安装应返回 0"
-    assert_contains "$(cat "$T/stderr.log")" "nothing installed yet" "首次安装不应报错"
+    assert_contains "$out" '"tag_name":"v1.5.3"' "release_json 应原样输出 JSON"
+    assert_eq "$(ls "$T/data/module"/release.*.json 2> /dev/null | wc -l | tr -d ' ')" "0" "临时文件应删除"
 
     teardown
 }
 
-test_check_versions() {
+test_release_failure() {
     setup
-    cat > "$T/fake.json" << 'JSON'
-{"tag_name":"v1.5.3","assets":[]}
-JSON
 
-    printf 'v1.5.3\n' > "$T/data/module/mod/version"
     out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
+        download() { return 4; }
+        release_json
         echo rc=\$?
     ")
-    assert_contains "$out" "rc=1" "同版本应返回 1"
-
-    printf 'v1.5.2\n' > "$T/data/module/mod/version"
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
-    ")
-    assert_contains "$out" "v1.5.3" "旧版本应返回远端版本"
-    assert_contains "$out" "rc=0" "旧版本应返回 0"
+    assert_contains "$out" "rc=6" "下载失败应返回 6"
 
     teardown
 }
 
-test_minified_json() {
+test_update_requires_args() {
     setup
-    printf '{"tag_name":"v1.5.3","assets":[{"name":"a.ko","digest":"sha256:abc","browser_download_url":"https://example.invalid/x.ko"}]}' > "$T/fake.json"
 
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        get_remote_version
-    ")
-    assert_contains "$out" "v1.5.3" "压缩 JSON 应能解析 tag"
-
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        get_remote_urls
-    ")
-    assert_contains "$out" "https://example.invalid/x.ko" "压缩 JSON 应能提取 URL"
-
-    out=$(mod_call "_json_asset '$T/fake.json' 'a.ko'")
-    assert_contains "$out" "https://example.invalid/x.ko|abc" "压缩 JSON 应能匹配 asset"
+    out=$(mod_call "mod_update; echo rc=\$?")
+    assert_contains "$out" "rc=1" "缺少参数应返回 1"
 
     teardown
 }
 
-test_check_api_error() {
+test_update_rejects_bad_sha() {
     setup
-    printf '{"message":"API rate limit exceeded"}' > "$T/fake.json"
 
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
-    ")
-    assert_contains "$out" "rc=2" "上游错误 JSON 应返回 2"
-    assert_contains "$(cat "$T/stderr.log")" "API rate limit exceeded" "应带出上游的错误信息"
-
-    teardown
-}
-
-test_check_non_json_response() {
-    setup
-    printf '<html><body>rate limited</body></html>' > "$T/fake.json"
-
-    out=$(mod_call "
-        download() { cp '$T/fake.json' \"\$2\"; }
-        mod_check
-        echo rc=\$?
-    ")
-    assert_contains "$out" "rc=2" "非 JSON 响应应返回 2"
-    assert_contains "$(cat "$T/stderr.log")" "response:" "应输出响应片段"
+    out=$(mod_call "mod_update v1 'https://example.invalid/x.ko' 'not-a-sha'; echo rc=\$?")
+    assert_contains "$out" "rc=3" "非法 sha256 应返回 3"
 
     teardown
 }
@@ -238,9 +187,8 @@ test_update_refreshes_boot_script() {
     printf 'OLD\n' > "$T/data/post-fs-data.d/module.sh"
 
     mod_call "
-        get_remote() { echo 'v9.9.9|$SHA|https://example.invalid/x.ko'; }
         download() { cp '$T/payload.ko' \"\$2\"; }
-        mod_update
+        mod_update v9.9.9 'https://example.invalid/x.ko' '$SHA'
     " > /dev/null
 
     assert_contains "$(head -1 "$T/data/post-fs-data.d/module.sh")" "#!/system/bin/sh" "更新后应刷新副本"
@@ -248,9 +196,8 @@ test_update_refreshes_boot_script() {
     # 开关关闭时不创建副本
     rm -f "$T/data/post-fs-data.d/module.sh"
     mod_call "
-        get_remote() { echo 'v9.9.9|$SHA|https://example.invalid/x.ko'; }
         download() { cp '$T/payload.ko' \"\$2\"; }
-        mod_update
+        mod_update v9.9.9 'https://example.invalid/x.ko' '$SHA'
     " > /dev/null
     assert_missing "$T/data/post-fs-data.d/module.sh" "开关关闭时不应创建副本"
 
@@ -296,11 +243,10 @@ for test in \
     test_autoload_toggle \
     test_boot_script_paths \
     test_boot_script_respects_disable \
-    test_check_first_install \
-    test_check_versions \
-    test_minified_json \
-    test_check_api_error \
-    test_check_non_json_response \
+    test_release_json \
+    test_release_failure \
+    test_update_requires_args \
+    test_update_rejects_bad_sha \
     test_update_refreshes_boot_script \
     test_customize_refresh \
     test_uninstall_cleanup; do

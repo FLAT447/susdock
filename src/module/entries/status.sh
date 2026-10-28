@@ -40,6 +40,8 @@ status_reboot_required() {
 status_quick() {
     _android=$(android_version 2> /dev/null || echo "unknown")
     _kernel=$(kernel_version 2> /dev/null || echo "unknown")
+    # GKI 分支来自 uname 的 -androidNN- 标记，选择上游资产时优先用它
+    _gki=$(android_kernel_version 2> /dev/null || echo "")
 
     if susfs_installed; then
         _loaded="true"
@@ -64,23 +66,12 @@ status_quick() {
 
     echo "android_version=$_android"
     echo "kernel_version=$_kernel"
+    echo "gki_branch=$_gki"
     echo "loaded=$_loaded"
     echo "reboot_required=$_reboot"
     echo "running_version=$_running"
     echo "local_version=$_local"
     echo "ko_size=$_size"
-    return 0
-}
-
-# Get summary info including the remote version. This performs a network
-# request, so it can take a while on a slow connection.
-# Usage: status_info
-# Outputs key=value lines to stdout
-status_info() {
-    status_quick
-
-    _remote=$(get_remote_version 2> /dev/null || echo "unknown")
-    echo "remote_version=$_remote"
     return 0
 }
 
@@ -94,7 +85,6 @@ status_dispatch() {
         susfs_version) status_susfs_version "$@" ;;
         reboot_required) status_reboot_required "$@" ;;
         quick) status_quick "$@" ;;
-        info) status_info "$@" ;;
         *) err "unknown status subcommand: ${_sub:-<empty>}" ;;
     esac
 }

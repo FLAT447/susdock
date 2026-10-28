@@ -45,18 +45,13 @@ sh <moddir>/entry.sh <command> [subcommand] [args...]
 
 ### 2.2 退出码
 
-| 退出码 | 含义                                         |
-| ------ | -------------------------------------------- |
-| `0`    | 成功 / 布尔命令为真 / `mod check` 发现新版本 |
-| `1`    | 通用失败；布尔命令为假；`mod check` 已是最新 |
-| `>1`   | 具体错误码，见第 6 节                        |
+| 退出码 | 含义                   |
+| ------ | ---------------------- |
+| `0`    | 成功 / 布尔命令为真    |
+| `1`    | 通用失败；布尔命令为假 |
+| `>1`   | 具体错误码，见第 6 节  |
 
 `err()` 会往 stderr 写 `[ERROR] <message>`，然后 `exit 1`。所以退出码为 1 时要再看一眼 stderr：有 `[ERROR]` 是执行失败，没有就是正常的否定结果。
-
-```
-mod check → exit 1 + 无 [ERROR] → 已是最新
-mod check → exit 1 + 有 [ERROR] → 出错
-```
 
 ### 2.3 前置检查
 
@@ -84,24 +79,23 @@ mod check → exit 1 + 有 [ERROR] → 出错
 
 ## 4. 命令一览
 
-| 命令                     | 作用                 | 网络   |
-| ------------------------ | -------------------- | ------ |
-| `status installed`       | 驱动是否已加载       | 否     |
-| `status susfs_version`   | 运行中的 SuSFS 版本  | 否     |
-| `status reboot_required` | 是否需要重启         | 否     |
-| `status quick`           | 本机状态汇总         | 否     |
-| `status info`            | 本机状态 + 上游版本  | **是** |
-| `mod check`              | 检查更新             | **是** |
-| `mod update`             | 下载并安装更新       | **是** |
-| `mod version`            | 本地已安装版本       | 否     |
-| `mod clear-reboot`       | 清除重启标记         | 否     |
-| `mod upstream`           | 读取本次生效的更新源 | 否     |
-| `mod autoload`           | 读取开机加载开关状态 | 否     |
-| `mod autoload on\|off`   | 开启 / 关闭开机加载  | 否     |
-| `log tail [lines]`       | 读取日志尾部         | 否     |
-| `log clear`              | 清空日志             | 否     |
-| `log level`              | 读取日志等级         | 否     |
-| `log set-level <LEVEL>`  | 设置日志等级         | 否     |
+| 命令                     | 作用                  | 网络   |
+| ------------------------ | --------------------- | ------ |
+| `status installed`       | 驱动是否已加载        | 否     |
+| `status susfs_version`   | 运行中的 SuSFS 版本   | 否     |
+| `status reboot_required` | 是否需要重启          | 否     |
+| `status quick`           | 本机状态汇总          | 否     |
+| `mod release`            | 下载上游 release JSON | **是** |
+| `mod update`             | 按给定 URL 安装更新   | **是** |
+| `mod version`            | 本地已安装版本        | 否     |
+| `mod clear-reboot`       | 清除重启标记          | 否     |
+| `mod upstream`           | 读取本次生效的更新源  | 否     |
+| `mod autoload`           | 读取开机加载开关状态  | 否     |
+| `mod autoload on\|off`   | 开启 / 关闭开机加载   | 否     |
+| `log tail [lines]`       | 读取日志尾部          | 否     |
+| `log clear`              | 清空日志              | 否     |
+| `log level`              | 读取日志等级          | 否     |
+| `log set-level <LEVEL>`  | 设置日志等级          | 否     |
 
 ## 5. 命令详情
 
@@ -137,6 +131,7 @@ exit:   0 需要重启 / 1 不需要
 ```
 android_version=14
 kernel_version=6.1
+gki_branch=14
 loaded=true
 reboot_required=false
 running_version=1.5.2
@@ -148,6 +143,7 @@ ko_size=482304
 | ----------------- | -------------- | ---------------------------------------------- |
 | `android_version` | string         | `ro.build.version.release`，取不到为 `unknown` |
 | `kernel_version`  | string         | 内核主次版本，如 `6.1`                         |
+| `gki_branch`      | string         | `uname -r` 里的 `-androidNN-`，取不到为空串    |
 | `loaded`          | `true`/`false` | `lsmod` 中是否存在 `susfs_guard_lkm`           |
 | `reboot_required` | `true`/`false` | 重启标记文件是否存在                           |
 | `running_version` | string         | `ksu_susfs show version`，去 `v` 前缀          |
@@ -156,81 +152,46 @@ ko_size=482304
 
 `local_version` 来自上游 `tag_name`，可能带 `v` 前缀；`running_version` 已经去掉前缀。前端比较两者前先统一去掉 `v`。
 
+`gki_branch` 用来选上游资产：优先用它，取不到时退回 `android_version` 的主号。
+
 退出码恒为 `0`，单项失败会降级成 `unknown`。
 
-### 5.5 `status info`
+### 5.5 `mod release`
 
-`status quick` 的全部字段，外加：
-
-```
-remote_version=v1.5.3
-```
-
-| key              | 类型   | 说明                           |
-| ---------------- | ------ | ------------------------------ |
-| `remote_version` | string | 上游最新 tag，失败为 `unknown` |
-
-会请求 GitHub API，超时上限约 15 秒。不要放进高频刷新里。
-
-### 5.6 `mod check`
+下载上游 release JSON 并原样输出到 stdout。**脚本不解析 JSON**，解析由 WebUI 用 `JSON.parse` 完成。
 
 ```
-# 有新版本
-stdout: v1.5.3
-exit:   0
-
-# 已是最新
-stdout: (空)
-exit:   1
-stderr: [2026-10-27 12:00:00] [INFO] up-to-date (v1.5.2)
-
-# 出错
-stdout: (空)
-exit:   2 | 3 | 6
-stderr: [ERROR] ...
+stdout: {"tag_name":"v2.3.0-r18.5","assets":[...]}
+exit:   0 成功 / 6 拉取失败
 ```
 
-| 退出码 | 含义                                  |
-| ------ | ------------------------------------- |
-| `0`    | 有新版本或尚未安装，stdout 为上游 tag |
-| `1`    | 已是最新（**无** `[ERROR]`）          |
-| `2`    | 上游 JSON 解析失败                    |
-| `6`    | 拉取上游信息失败（网络）              |
+下载失败时 stderr 有 `[ERROR] failed to fetch release info`。临时文件写在 `/data/adb/<id>/release.<pid>.json`，输出后删除。
 
-首次安装还没有 `mod/version` 时按「有新版本」处理，退出码为 `0`，不报错。`mod version` 单独调用时仍以退出码 `3` 表示本地版本文件缺失。
+### 5.6 `mod update <version> <url> <sha256>`
 
-前端可以这么判：
-
-```ts
-if (errno === 0)
-    return { state: "available", version: stdout.trim() };
-if (stderr.includes("[ERROR]"))
-    return { state: "error", message: lastError(stderr) };
-return { state: "current" };
-```
-
-### 5.7 `mod update`
-
-下载与当前设备匹配的 `.ko`，校验 sha256，写版本文件，再创建重启标记。
+按调用方给出的资产安装：下载 `.ko`，校验 sha256，写版本文件，创建重启标记。URL 必须是 `https://` 开头，sha256 为 64 位十六进制。
 
 ```
+sh entry.sh mod update v2.3.0-r18.5 \
+    https://github.com/.../susfs_guard_lkm-android15-6.6.ko \
+    7c2a274798fc6afd32e74d20321065612d8d656185fa91764dadcdd29f25f372
 stdout: (空)
 stderr: [..] [INFO] download [...]: https://... -> /data/adb/<id>/mod/susfs_guard_lkm.ko
-        [..] [INFO] update installed: v1.5.3 (reboot to take effect)
+        [..] [INFO] update installed: v2.3.0-r18.5 (reboot to take effect)
 exit:   0
 ```
 
-| 退出码 | 含义                                 |
-| ------ | ------------------------------------ |
-| `0`    | 安装成功，**重启后生效**             |
-| `1`    | 拿不到上游信息，或没有匹配本机的驱动 |
-| `2`    | 下载失败                             |
-| `3`    | 上游无 sha256，或校验不匹配          |
-| `4`    | 写入失败（目录、权限、磁盘）         |
+| 退出码 | 含义                          |
+| ------ | ----------------------------- |
+| `0`    | 安装成功，**重启后生效**      |
+| `1`    | 参数缺失，或 URL 不是 https   |
+| `2`    | 下载失败                      |
+| `3`    | sha256 格式错误，或校验不匹配 |
+| `4`    | 写入失败（目录、权限、磁盘）  |
 
 失败时 stderr 最后一行通常以 `[ERROR]` 开头，可以直接展示。
 
-### 5.8 `mod version`
+### 5.7 `mod version`
 
 ```
 stdout: v1.5.2
@@ -239,13 +200,13 @@ exit:   0
 
 本地版本文件缺失时退出码为 `3`。
 
-### 5.9 `mod clear-reboot`
+### 5.8 `mod clear-reboot`
 
 ```
 exit: 0 成功 / 1 删除失败
 ```
 
-### 5.10 `log tail [lines]`
+### 5.9 `log tail [lines]`
 
 读取日志尾部，输出纯文本，不是 `key=value`。
 
@@ -266,11 +227,11 @@ sh entry.sh log tail 200
 [2026-10-27 12:00:03] [INFO] download done: /data/adb/...
 ```
 
-### 5.11 `log clear`
+### 5.10 `log clear`
 
 清空 `module.log` 并删掉 `module.log.1`。退出码恒为 `0`。
 
-### 5.12 `log level`
+### 5.11 `log level`
 
 ```
 stdout: INFO
@@ -279,7 +240,7 @@ exit:   0
 
 取值：`DEBUG` | `INFO` | `WARN` | `ERROR`。
 
-### 5.13 `log set-level <LEVEL>`
+### 5.12 `log set-level <LEVEL>`
 
 大小写不敏感，写入 `/data/adb/<id>/config`：
 
@@ -297,7 +258,7 @@ exit:   0
 
 新等级在下一条命令执行时生效，当前进程不受影响。环境变量 `LOG_LEVEL` 的优先级高于配置文件。
 
-### 5.14 `mod upstream`
+### 5.13 `mod upstream`
 
 读取本次调用实际生效的更新源。配置由 WebUI 存在 `localStorage`，调脚本时通过环境变量传进来，脚本本身不读写上游配置。
 
@@ -313,7 +274,7 @@ official=https://api.github.com/repos/inforcqb/susfs4ksu-lkm/releases/latest
 | `mirror`   | 驱动下载加速前缀，空串表示直连 |
 | `official` | 官方地址（默认值）             |
 
-### 5.15 `mod autoload`
+### 5.14 `mod autoload`
 
 控制开机时是否自动加载已安装的驱动。开关状态就是
 `/data/adb/post-fs-data.d/<id>.sh` 是否存在，不写配置文件。
@@ -335,7 +296,7 @@ stdout: enabled=true | enabled=false
 
 卸载模块时 `uninstall.sh` 会删掉这个脚本，避免残留。
 
-### 5.16 上游相关环境变量
+### 5.15 上游相关环境变量
 
 | 变量              | 说明                                                                               |
 | ----------------- | ---------------------------------------------------------------------------------- |
@@ -352,7 +313,7 @@ UPSTREAM_MIRROR='https://ghfast.top/' \
 sh entry.sh mod check
 ```
 
-### 5.17 日志等级过滤
+### 5.16 日志等级过滤
 
 `log <level> <message>` 只输出大于等于当前等级的日志：
 
@@ -378,22 +339,19 @@ sh entry.sh mod check
 
 ### upstream.sh
 
-| 码  | 含义          |
-| --- | ------------- |
-| 2   | JSON 解析失败 |
-| 3   | 本地文件缺失  |
-| 4   | 缺少 sha256   |
-| 5   | 本地文件异常  |
-| 6   | 拉取上游失败  |
+| 码  | 含义         |
+| --- | ------------ |
+| 3   | 本地文件缺失 |
+| 6   | 拉取上游失败 |
 
 ### entries/mod.sh
 
-| 码  | 含义         |
-| --- | ------------ |
-| 1   | 检查更新失败 |
-| 2   | 下载失败     |
-| 3   | 校验失败     |
-| 4   | 写入失败     |
+| 码  | 含义                  |
+| --- | --------------------- |
+| 1   | 参数缺失或 URL 非法   |
+| 2   | 下载失败              |
+| 3   | sha256 非法或校验失败 |
+| 4   | 写入失败              |
 
 ### entries/status.sh
 
@@ -411,9 +369,9 @@ sh entry.sh mod check
 
 ## 7. 对接注意
 
-1. 状态卡用 `status quick`。`status info` 每次都联网，别拿去刷新。
-2. 更新检测单独走 `mod check`，按钮上要有进行中状态。
-3. `mod update` 返回 0 只代表文件装好了，要把「重启后生效」说清楚，再刷新状态卡读 `reboot_required`。
+1. 状态卡用 `status quick`，不联网，适合每次刷新。
+2. 更新检测走 `mod release` + 前端 `JSON.parse`：用 `tag_name` 对比 `local_version`，用 `gki_branch` / `kernel_version` 匹配资产名 `susfs_guard_lkm-android<branch>-<kernel>.ko`。
+3. `mod update` 需要显式传版本、URL、sha256；返回 0 只代表文件装好了，要把「重启后生效」说清楚，再刷新状态卡读 `reboot_required`。
 4. 日志面板用 `log tail`，纯文本渲染，清空后立刻重新拉。
 5. 改完日志等级要提示「下次执行生效」，当前日志不会马上变。
 6. `exec()` 可能因为 SELinux、权限或模块被禁用直接失败，`errno !== 0` 必须处理。

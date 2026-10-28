@@ -1,3 +1,4 @@
+import type { PendingUpdate } from "../api";
 import type { SdStatusCard } from "./sd-status-card";
 import type { SdUpdateCard } from "./sd-update-card";
 import type { SdUpstreamDialog } from "./sd-upstream-dialog";
@@ -15,7 +16,7 @@ import "./sd-update-card";
 import "./sd-upstream-dialog";
 
 const FAIL_REASONS: Partial<Record<number, string>> = {
-    1: "拿不到上游信息，或没有匹配本机的驱动。",
+    1: "安装参数无效（版本、URL 或 sha256）。",
     2: "下载失败，请检查网络。",
     3: "驱动校验失败（sha256 不匹配）。",
     4: "写入失败，请检查存储空间与权限。",
@@ -26,6 +27,7 @@ const FAIL_REASONS: Partial<Record<number, string>> = {
  * 页面结构全部写在 index.html，这里只绑事件、写数据。
  */
 export class SdApp extends HTMLElement {
+    private pending: PendingUpdate | null = null;
     private ready = false;
 
     connectedCallback(): void {
@@ -61,6 +63,27 @@ export class SdApp extends HTMLElement {
         this.addEventListener("sd-upstream-changed", () => update.setIdle());
 
         void this.refreshStatus();
+        this.autoCheck();
+    }
+
+    // 打开页面时自动查一次。10 分钟内重复打开不重复请求，
+    // 避免未认证的 GitHub API 被刷到限流。
+    private autoCheck(): void {
+        const key = "autoCheckAt";
+        const interval = 10 * 60 * 1000;
+
+        try {
+            const last = Number(localStorage.getItem(key) ?? "0");
+            if (Number.isFinite(last) && Date.now() - last < interval) {
+                return;
+            }
+            localStorage.setItem(key, String(Date.now()));
+        }
+        catch {
+            // 读不了就每次都查
+        }
+
+        void this.detectUpdate();
     }
 
     private syncTheme(button: HTMLButtonElement): void {
@@ -93,29 +116,42 @@ export class SdApp extends HTMLElement {
             const result = await checkUpdate();
 
             if (result.state === "available") {
-                card.setAvailable(result.version);
+                this.pending = result.update;
+                card.setAvailable(result.update.version);
                 return;
             }
             if (result.state === "current") {
-                card.setCurrent("");
+                this.pending = null;
+                card.setCurrent(result.version);
                 return;
             }
 
+            this.pending = null;
             card.setNote(`检测失败：${result.message}`);
         }
         catch (error) {
+            this.pending = null;
             card.setNote(`检测失败：${messageOf(error)}`);
         }
     }
 
     private async installUpdate(): Promise<void> {
+        if (this.pending === null) {
+            await this.detectUpdate();
+            if (this.pending === null) {
+                return;
+            }
+        }
+
+        const update = this.pending;
         const card = requireElement<SdUpdateCard>(this, "sd-update-card");
         card.setBusy("正在下载并校验…");
 
         try {
-            const result = await applyUpdate();
+            const result = await applyUpdate(update);
 
             if (result.ok) {
+                this.pending = null;
                 await this.refreshStatus();
                 card.setNote("更新完成，重启后生效。");
                 notify("更新完成，重启后生效");
