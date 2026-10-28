@@ -78,6 +78,12 @@ EOF
         return "$MOD_ERR_WRITE"
     }
 
+    # 开关开启时同步副本，否则 post-fs-data.d 里还是上一版脚本。
+    # 失败只记一条警告：驱动已经装好，不能因此让更新整体失败。
+    if autoload_enabled; then
+        autoload_enable || log WARN "failed to refresh autoload script"
+    fi
+
     log INFO "update installed: $_ver (reboot to take effect)"
     return 0
 }
