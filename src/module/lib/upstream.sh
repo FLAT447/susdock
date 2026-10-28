@@ -106,7 +106,13 @@ _us_asset_urls() {
 # Fetch release JSON and resolve remote info
 # Sets: _RV (version), _RU (matched asset url), _RS (sha256), _RULIST (all urls)
 _us_resolve() {
-    _tmp=$(mktemp)
+    # Keep the scratch file under the module data dir. mktemp uses TMPDIR,
+    # which the KernelSU WebUI points at the app cache; that directory is
+    # owned by the app uid, so a root process may fail to read it back
+    # under SELinux even though the download itself succeeded.
+    _tmp="${DATA_DIR}/release.$$.json"
+    mkdir -p "$DATA_DIR" 2> /dev/null
+
     download "$UPSTREAM_API" "$_tmp" || {
         log ERROR "failed to fetch release info"
         rm -f "$_tmp"
