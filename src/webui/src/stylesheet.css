@@ -496,9 +496,10 @@ sd-log-panel .log {
 /* 加载指示器：只让 SVG 的 path 转，外层按钮保持不动 */
 .btn .spinner {
     flex: none;
-    fill: #e3e3e3;
+    fill: currentColor;
     width: 16px;
     height: 16px;
+    color: inherit;
 }
 
 .btn.busy .spinner path {
