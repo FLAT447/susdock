@@ -178,6 +178,43 @@ JSON
     teardown
 }
 
+test_minified_json() {
+    setup
+    printf '{"tag_name":"v1.5.3","assets":[{"name":"a.ko","digest":"sha256:abc","browser_download_url":"https://example.invalid/x.ko"}]}' > "$T/fake.json"
+
+    out=$(mod_call "
+        download() { cp '$T/fake.json' \"\$2\"; }
+        get_remote_version
+    ")
+    assert_contains "$out" "v1.5.3" "压缩 JSON 应能解析 tag"
+
+    out=$(mod_call "
+        download() { cp '$T/fake.json' \"\$2\"; }
+        get_remote_urls
+    ")
+    assert_contains "$out" "https://example.invalid/x.ko" "压缩 JSON 应能提取 URL"
+
+    out=$(mod_call "_json_asset '$T/fake.json' 'a.ko'")
+    assert_contains "$out" "https://example.invalid/x.ko|abc" "压缩 JSON 应能匹配 asset"
+
+    teardown
+}
+
+test_check_api_error() {
+    setup
+    printf '{"message":"API rate limit exceeded"}' > "$T/fake.json"
+
+    out=$(mod_call "
+        download() { cp '$T/fake.json' \"\$2\"; }
+        mod_check
+        echo rc=\$?
+    ")
+    assert_contains "$out" "rc=2" "上游错误 JSON 应返回 2"
+    assert_contains "$(cat "$T/stderr.log")" "API rate limit exceeded" "应带出上游的错误信息"
+
+    teardown
+}
+
 test_update_refreshes_boot_script() {
     setup
     printf 'payload\n' > "$T/payload.ko"
@@ -246,6 +283,8 @@ for test in \
     test_boot_script_respects_disable \
     test_check_first_install \
     test_check_versions \
+    test_minified_json \
+    test_check_api_error \
     test_update_refreshes_boot_script \
     test_customize_refresh \
     test_uninstall_cleanup; do
