@@ -29,59 +29,59 @@ _dl_tool() {
 #   dest: The destination file path to save the downloaded content
 # Returns 0 on success, non-zero on failure.
 download() {
-    url="$1"
-    dest="$2"
+    _url="$1"
+    _dest="$2"
 
-    [ -n "$url" ] || {
+    [ -n "$_url" ] || {
         log ERROR "download: missing url"
         return "$DL_ERR_ARG"
     }
 
-    [ -n "$dest" ] || {
+    [ -n "$_dest" ] || {
         log ERROR "download: missing dest"
         return "$DL_ERR_ARG"
     }
 
-    tool=$(_dl_tool)
-    [ -n "$tool" ] || {
+    _tool=$(_dl_tool)
+    [ -n "$_tool" ] || {
         log ERROR "no download tool available"
         return "$DL_ERR_TOOL"
     }
 
-    dest_dir=$(dirname "$dest")
-    [ -d "$dest_dir" ] || mkdir -p "$dest_dir" 2> /dev/null || {
-        log ERROR "cannot create dir: $dest_dir"
+    _dest_dir=$(dirname "$_dest")
+    [ -d "$_dest_dir" ] || mkdir -p "$_dest_dir" 2> /dev/null || {
+        log ERROR "cannot create dir: $_dest_dir"
         return "$DL_ERR_MKDIR"
     }
 
-    tmp="$dest.tmp.$$"
-    log INFO "download [$tool]: $url -> $dest"
+    _tmp="$_dest.tmp.$$"
+    log INFO "download [$_tool]: $_url -> $_dest"
 
-    case "$tool" in
-        curl) curl -fsSL --connect-timeout 15 -o "$tmp" "$url" ;;
-        wget) wget -q --timeout=15 -O "$tmp" "$url" ;;
-        busybox_wget) busybox wget -q -O "$tmp" "$url" ;;
+    case "$_tool" in
+        curl) curl -fsSL --connect-timeout 15 -o "$_tmp" "$_url" ;;
+        wget) wget -q --timeout=15 -O "$_tmp" "$_url" ;;
+        busybox_wget) busybox wget -q -O "$_tmp" "$_url" ;;
     esac
-    rc=$?
+    _rc=$?
 
-    if [ "$rc" -ne 0 ]; then
-        rm -f "$tmp"
-        log ERROR "download failed: $url"
+    if [ "$_rc" -ne 0 ]; then
+        rm -f "$_tmp"
+        log ERROR "download failed: $_url"
         return "$DL_ERR_NET"
     fi
 
-    if [ ! -s "$tmp" ]; then
-        rm -f "$tmp"
-        log ERROR "downloaded file is empty: $url"
+    if [ ! -s "$_tmp" ]; then
+        rm -f "$_tmp"
+        log ERROR "downloaded file is empty: $_url"
         return "$DL_ERR_EMPTY"
     fi
 
-    mv "$tmp" "$dest" || {
-        rm -f "$tmp"
-        log ERROR "cannot write: $dest"
+    mv "$_tmp" "$_dest" || {
+        rm -f "$_tmp"
+        log ERROR "cannot write: $_dest"
         return "$DL_ERR_WRITE"
     }
 
-    log INFO "download done: $dest"
+    log INFO "download done: $_dest"
     return 0
 }

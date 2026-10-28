@@ -12,9 +12,9 @@ MOD_ERR_WRITE=4
 # Returns 0 if update needed, 1 if up-to-date, >1 on error
 mod_check() {
     check_update
-    rc=$?
+    _rc=$?
 
-    if [ "$rc" -eq 0 ]; then
+    if [ "$_rc" -eq 0 ]; then
         # check_update already resolved the remote tag into $_rv, so there is
         # no need to hit the API a second time.
         # shellcheck disable=SC2154
@@ -22,8 +22,8 @@ mod_check() {
         return 0
     fi
 
-    [ "$rc" -eq 1 ] && return 1
-    return "$rc"
+    [ "$_rc" -eq 1 ] && return 1
+    return "$_rc"
 }
 
 # Download and install update (takes effect after reboot)

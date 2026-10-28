@@ -20,23 +20,23 @@ _level_num() {
 # Usage: log <level> <message>
 #   level: DEBUG | INFO | WARN | ERROR
 log() {
-    level="$1"
+    _level="$1"
     shift
-    msg="$*"
+    _msg="$*"
 
-    [ "$(_level_num "$level")" -ge "$(_level_num "$LOG_LEVEL")" ] || return 0
+    [ "$(_level_num "$_level")" -ge "$(_level_num "$LOG_LEVEL")" ] || return 0
 
-    ts=$(date '+%Y-%m-%d %H:%M:%S' 2> /dev/null || echo "----")
-    line="[$ts] [$level] $msg"
+    _ts=$(date '+%Y-%m-%d %H:%M:%S' 2> /dev/null || echo "----")
+    _line="[$_ts] [$_level] $_msg"
 
-    echo "$line" >&2
+    echo "$_line" >&2
 
     mkdir -p "$LOG_DIR" 2> /dev/null || return 0
     if [ -f "$LOG_FILE" ]; then
-        size=$(wc -c < "$LOG_FILE" 2> /dev/null || echo 0)
-        [ "$size" -gt "$LOG_MAX_BYTES" ] && mv "$LOG_FILE" "$LOG_FILE.1" 2> /dev/null
+        _size=$(wc -c < "$LOG_FILE" 2> /dev/null || echo 0)
+        [ "$_size" -gt "$LOG_MAX_BYTES" ] && mv "$LOG_FILE" "$LOG_FILE.1" 2> /dev/null
     fi
-    echo "$line" >> "$LOG_FILE" 2> /dev/null
+    echo "$_line" >> "$LOG_FILE" 2> /dev/null
 
     return 0
 }
