@@ -50,8 +50,8 @@ setup() {
     find "$T/module" -name '*.sh' -exec sed -i "s#/data/adb/#$T/data/#g" {} +
     mkdir -p "$T/bin" "$T/data/module/mod"
     printf '#!/bin/sh\nexit 0\n' > "$T/bin/lsmod"
-    printf '#!/bin/sh\nexit 0\n' > "$T/bin/insmod"
-    chmod +x "$T/bin/lsmod" "$T/bin/insmod"
+    printf '#!/bin/sh\nexit 0\n' > "$T/bin/ksud"
+    chmod +x "$T/bin/lsmod" "$T/bin/ksud"
 }
 
 teardown() {
@@ -117,13 +117,37 @@ test_boot_script_paths() {
     assert_contains "$out" "already loaded" "已加载时应跳过"
     assert_exists "$T/data/module/mod/reboot" "跳过时不应清除重启标记"
 
-    # insmod 失败时返回 1，保留标记
+    # ksud insmod 失败时返回 1，保留标记
     printf '#!/bin/sh\nexit 0\n' > "$T/bin/lsmod"
-    printf '#!/bin/sh\nexit 1\n' > "$T/bin/insmod"
-    chmod +x "$T/bin/lsmod" "$T/bin/insmod"
+    printf '#!/bin/sh\nexit 1\n' > "$T/bin/ksud"
+    chmod +x "$T/bin/lsmod" "$T/bin/ksud"
     PATH="$T/bin:$PATH" bash "$T/data/post-fs-data.d/module.sh" > /dev/null 2>&1
-    assert_eq "$?" "1" "insmod 失败应返回 1"
+    assert_eq "$?" "1" "ksud insmod 失败应返回 1"
     assert_exists "$T/data/module/mod/reboot" "失败时不应清除重启标记"
+
+    teardown
+}
+
+test_boot_script_requires_ksud() {
+    setup
+    : > "$T/data/module/mod/susfs_guard_lkm.ko"
+    rm -f "$T/bin/ksud"
+
+    out=$(PATH="$T/bin:/usr/bin:/bin" bash "$T/module/post-fs-data.sh" 2>&1)
+    rc=$?
+    assert_contains "$out" "ksud not found" "缺少 ksud 时应提示"
+    assert_eq "$rc" "1" "缺少 ksud 应返回 1"
+
+    teardown
+}
+
+test_boot_script_custom_ko_name() {
+    setup
+    : > "$T/data/module/mod/susfs_guard_lkm-android15-6.6.ko"
+
+    out=$(PATH="$T/bin:$PATH" bash "$T/module/post-fs-data.sh" 2>&1)
+    assert_contains "$out" "susfs: loaded" "任意名字的 .ko 也应加载"
+    assert_contains "$out" "susfs_guard_lkm-android15-6.6.ko" "日志应带上实际文件名"
 
     teardown
 }
@@ -269,6 +293,8 @@ test_uninstall_cleanup() {
 for test in \
     test_autoload_toggle \
     test_boot_script_paths \
+    test_boot_script_requires_ksud \
+    test_boot_script_custom_ko_name \
     test_boot_script_respects_disable \
     test_release_json \
     test_release_json_scratch_collision \
