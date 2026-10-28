@@ -138,7 +138,14 @@ _us_resolve() {
 # Returns 0 if update needed, 1 if up-to-date, >1 on error
 check_update() {
     _rv=$(get_remote_version) || return $?
-    _lv=$(get_local_version) || return $?
+
+    # A fresh install has no version file, or an empty one. That is not a
+    # failure: nothing is installed, so the remote release is the update.
+    # get_local_version logs an error in both cases, so probe it quietly.
+    if ! _lv=$(get_local_version 2> /dev/null); then
+        log INFO "nothing installed yet; update available: $_rv"
+        return 0
+    fi
 
     if [ "$_rv" = "$_lv" ]; then
         log INFO "up-to-date ($_lv)"
