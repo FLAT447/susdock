@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { exit } from "node:process";
@@ -7,22 +7,25 @@ import packageJson from "../package.json" with { type: "json" };
 import { log, Types } from "./log.ts";
 import { parseVersion } from "./version.ts";
 
-/**
- * "entries" is the list of files and directories to copy from the module directory to the dist directory.
- */
-
-const entries = [
-    "entries",
-    "entry.sh",
-    "lib",
-];
-
 const rootPath = join(import.meta.dirname, "..");
 const modulePath = join(rootPath, "src/module");
 const webuiDistPath = join(rootPath, "src/webui/dist");
 const distPath = join(rootPath, "dist");
 // 模块文件先落到 dist/source，再由它压成 dist/<name>-<tag>.zip
 const sourcePath = join(distPath, "source");
+
+/**
+ * src/module 下的顶层项全部复制进产物，只有这两个例外：
+ *   package.json - pnpm workspace 占位，运行时用不到
+ *   module.prop  - 源文件是模板，产物里的那份由构建脚本渲染
+ */
+const EXCLUDED_ENTRIES = new Set(["module.prop", "package.json"]);
+
+function moduleEntries(): string[] {
+    return readdirSync(modulePath)
+        .filter(name => !EXCLUDED_ENTRIES.has(name) && !name.startsWith("."))
+        .sort();
+}
 
 function buildModuleProps() {
     return {
@@ -61,7 +64,7 @@ function main(): void {
     mkdirSync(sourcePath, { recursive: true });
     writeFileSync(join(sourcePath, "module.prop"), renderModuleProp(moduleProps));
 
-    for (const entry of entries) {
+    for (const entry of moduleEntries()) {
         log(`Copying entry(${entry})...`, Types.detail);
         const path = join(modulePath, entry);
         if (!existsSync(path))

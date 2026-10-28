@@ -5,7 +5,7 @@
         "updateJson": "https://raw.githubusercontent.com/Nixie24/susdock/refs/heads/update/update.json"
     },
     "type": "module",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "private": true,
     "packageManager": "pnpm@12.14.0",
     "description": "A SuSFS Manager for LKM Setups",
@@ -19,6 +19,7 @@
         "dev": "pnpm --filter webui run dev",
         "build": "jiti scripts/build.ts",
         "pack": "jiti scripts/pack.ts",
+        "test": "bash tests/run.sh",
         "webui:build": "pnpm --filter webui run build",
         "lint": "eslint",
         "commit:lint": "commitfmt --lint",

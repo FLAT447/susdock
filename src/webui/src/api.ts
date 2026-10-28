@@ -155,6 +155,20 @@ export async function applyUpdate(): Promise<UpdateResult> {
     return { errno, log, ok: errno === 0 };
 }
 
+/*
+ * 开机加载开关的状态就是 post-fs-data.d/ 里有没有本模块的脚本，
+ * 所以每次都问后端，不在前端缓存。
+ */
+export async function readAutoload(): Promise<boolean> {
+    const map = parseKV(await runOk("mod autoload"));
+    return first(map, "enabled") === "true";
+}
+
+export async function setAutoload(enabled: boolean): Promise<boolean> {
+    const map = parseKV(await runOk(`mod autoload ${enabled ? "on" : "off"}`));
+    return first(map, "enabled") === "true";
+}
+
 export function readLog(lines = 300): Promise<string> {
     const count = Math.min(Math.max(Math.trunc(lines), 1), MAX_LOG_LINES);
     return runOk(`log tail ${count}`);

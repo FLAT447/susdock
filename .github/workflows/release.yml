@@ -27,6 +27,15 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile
 
+      - name: lint
+        run: pnpm lint
+
+      - name: typecheck
+        run: pnpm --filter webui exec tsc --noEmit
+
+      - name: test
+        run: pnpm test
+
       - name: version
         id: version
         run: |
@@ -35,13 +44,28 @@ jobs:
           echo "versionCode=$code" >>"$GITHUB_OUTPUT"
           echo "tag=v${version}-${code}" >>"$GITHUB_OUTPUT"
 
+      - name: check release
+        id: tagcheck
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >>"$GITHUB_OUTPUT"
+            echo "::notice::Release ${{ steps.version.outputs.tag }} already exists, skipping"
+          else
+            echo "exists=false" >>"$GITHUB_OUTPUT"
+          fi
+
       - name: build
+        if: steps.tagcheck.outputs.exists == 'false'
         run: pnpm build
 
       - name: pack
+        if: steps.tagcheck.outputs.exists == 'false'
         run: pnpm run pack
 
       - name: publish
+        if: steps.tagcheck.outputs.exists == 'false'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}

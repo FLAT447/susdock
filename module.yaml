@@ -16,7 +16,7 @@ authors:
 
 compatibility:
   androidMinApi: 31
-  architectures: [armeabi-v7a, arm64-v8a]
+  architectures: [arm64-v8a]
 
 release:
   assetPattern: "*.zip"

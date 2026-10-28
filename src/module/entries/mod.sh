@@ -12,9 +12,9 @@ MOD_ERR_WRITE=4
 # Returns 0 if update needed, 1 if up-to-date, >1 on error
 mod_check() {
     check_update
-    rc=$?
+    _rc=$?
 
-    if [ "$rc" -eq 0 ]; then
+    if [ "$_rc" -eq 0 ]; then
         # check_update already resolved the remote tag into $_rv, so there is
         # no need to hit the API a second time.
         # shellcheck disable=SC2154
@@ -22,8 +22,8 @@ mod_check() {
         return 0
     fi
 
-    [ "$rc" -eq 1 ] && return 1
-    return "$rc"
+    [ "$_rc" -eq 1 ] && return 1
+    return "$_rc"
 }
 
 # Download and install update (takes effect after reboot)
@@ -78,6 +78,12 @@ EOF
         return "$MOD_ERR_WRITE"
     }
 
+    # 开关开启时同步副本，否则 post-fs-data.d 里还是上一版脚本。
+    # 失败只记一条警告：驱动已经装好，不能因此让更新整体失败。
+    if autoload_enabled; then
+        autoload_enable || log WARN "failed to refresh autoload script"
+    fi
+
     log INFO "update installed: $_ver (reboot to take effect)"
     return 0
 }
@@ -111,6 +117,37 @@ mod_upstream() {
     return 0
 }
 
+# Toggle boot-time autoload. With no argument, print the current state.
+# Usage: mod_autoload [on|off]
+mod_autoload() {
+    _mode="${1:-}"
+
+    case "$_mode" in
+        "")
+            if autoload_enabled; then
+                echo "enabled=true"
+            else
+                echo "enabled=false"
+            fi
+            return 0
+            ;;
+        on)
+            autoload_enable || return "$MOD_ERR_WRITE"
+            echo "enabled=true"
+            return 0
+            ;;
+        off)
+            autoload_disable || return "$MOD_ERR_WRITE"
+            echo "enabled=false"
+            return 0
+            ;;
+        *)
+            log ERROR "invalid autoload mode: $_mode"
+            return 1
+            ;;
+    esac
+}
+
 # Dispatch mod subcommands
 # Usage: mod_dispatch <subcommand> [args...]
 mod_dispatch() {
@@ -122,6 +159,7 @@ mod_dispatch() {
         version) mod_version "$@" ;;
         clear-reboot) mod_clear_reboot "$@" ;;
         upstream) mod_upstream "$@" ;;
+        autoload) mod_autoload "$@" ;;
         *) err "unknown mod subcommand: ${_sub:-<empty>}" ;;
     esac
 }
