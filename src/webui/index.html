@@ -69,6 +69,23 @@
 
         <section class="card">
             <div class="card-head">
+                <h2>开机加载</h2>
+            </div>
+
+            <sd-autoload-card>
+                <label class="switch-row">
+                    <span class="switch-text">
+                        <span class="switch-k">开机自动加载驱动</span>
+                        <span class="switch-hint">开启后把加载脚本写入 /data/adb/post-fs-data.d/</span>
+                    </span>
+                    <input class="switch" id="autoload-toggle" type="checkbox" role="switch">
+                </label>
+                <p class="meta" id="autoload-meta">读取中…</p>
+            </sd-autoload-card>
+        </section>
+
+        <section class="card">
+            <div class="card-head">
                 <h2>检测更新</h2>
                 <button class="icon-btn" type="button" id="upstream-open" title="更新源设置" aria-label="更新源设置">
                     <svg class="icon" aria-hidden="true"><use href="#icon-setting"></use></svg>

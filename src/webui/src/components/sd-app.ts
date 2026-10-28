@@ -6,6 +6,7 @@ import { messageOf } from "../errors";
 import { notify } from "../notify";
 import { currentTheme, initTheme, toggleTheme } from "../theme";
 import { requireElement } from "./dom";
+import "./sd-autoload-card";
 import "./sd-badge";
 import "./sd-log-panel";
 import "./sd-row";
