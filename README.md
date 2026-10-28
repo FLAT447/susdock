@@ -7,6 +7,7 @@ SuSFS 的 LKM 管理器，跑在 KernelSU 上。不在本地编内核模块，�
 - 查 [inforcqb/susfs4ksu-lkm](https://github.com/inforcqb/susfs4ksu-lkm) 的最新发布
 - 按 `<Android 版本>-<内核版本>` 选对应的 `.ko`，sha256 对得上才写进 `/data/adb/susdock/mod/`
 - 装完留下重启标记，重启后生效
+- 开机时由 `post-fs-data.sh` 自动 `insmod` 已安装的驱动，不需要手动加载
 - 自带 WebUI：看状态、查更新、翻日志（可倒序）、清日志、调等级、换更新源
 
 ## 要求

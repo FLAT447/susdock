@@ -15,6 +15,7 @@ const entries = [
     "entries",
     "entry.sh",
     "lib",
+    "post-fs-data.sh",
 ];
 
 const rootPath = join(import.meta.dirname, "..");
