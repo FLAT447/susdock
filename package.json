@@ -19,6 +19,7 @@
         "dev": "pnpm --filter webui run dev",
         "build": "jiti scripts/build.ts",
         "pack": "jiti scripts/pack.ts",
+        "test": "bash tests/run.sh",
         "webui:build": "pnpm --filter webui run build",
         "lint": "eslint",
         "commit:lint": "commitfmt --lint",

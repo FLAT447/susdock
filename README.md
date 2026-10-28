@@ -55,6 +55,7 @@ pnpm install
 pnpm dev          # WebUI 开发服务器
 pnpm build        # 构建模块，产物在 dist/source/
 pnpm run pack     # 把 dist/source/ 压成 dist/<id>-v<version>-<versionCode>.zip
+pnpm test         # 模块脚本回归测试（临时目录 + 假 lsmod/insmod）
 pnpm lint         # ESLint + shfmt + shellcheck
 ```
 
