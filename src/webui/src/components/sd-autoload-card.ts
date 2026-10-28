@@ -75,8 +75,8 @@ export class SdAutoloadCard extends HTMLElement {
 
     private setMeta(enabled: boolean): void {
         this.meta().textContent = enabled
-            ? "已开启，重启后自动加载驱动。"
-            : "已关闭，重启后不会自动加载。";
+            ? "已开启，重启后会优先加载驱动。"
+            : "已关闭，重启后不会加载驱动。";
     }
 
     private meta(): HTMLElement {

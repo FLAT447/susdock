@@ -276,7 +276,7 @@ official=https://api.github.com/repos/inforcqb/susfs4ksu-lkm/releases/latest
 
 ### 5.14 `mod autoload`
 
-控制开机时是否自动加载已安装的驱动。开关状态就是
+控制开机时是否优先加载已安装的驱动。开关状态就是
 `/data/adb/post-fs-data.d/<id>.sh` 是否存在，不写配置文件。
 
 ```
