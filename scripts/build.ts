@@ -13,6 +13,7 @@ import { parseVersion } from "./version.ts";
 
 const entries = [
     "autoload.sh",
+    "customize.sh",
     "entries",
     "entry.sh",
     "lib",
