@@ -96,6 +96,8 @@ mod check → exit 1 + 有 [ERROR] → 出错
 | `mod version`            | 本地已安装版本       | 否     |
 | `mod clear-reboot`       | 清除重启标记         | 否     |
 | `mod upstream`           | 读取本次生效的更新源 | 否     |
+| `mod autoload`           | 读取开机加载开关状态 | 否     |
+| `mod autoload on\|off`   | 开启 / 关闭开机加载  | 否     |
 | `log tail [lines]`       | 读取日志尾部         | 否     |
 | `log clear`              | 清空日志             | 否     |
 | `log level`              | 读取日志等级         | 否     |
@@ -311,7 +313,29 @@ official=https://api.github.com/repos/inforcqb/susfs4ksu-lkm/releases/latest
 | `mirror`   | 驱动下载加速前缀，空串表示直连 |
 | `official` | 官方地址（默认值）             |
 
-### 5.15 上游相关环境变量
+### 5.15 `mod autoload`
+
+控制开机时是否自动加载已安装的驱动。开关状态就是
+`/data/adb/post-fs-data.d/<id>.sh` 是否存在，不写配置文件。
+
+```
+sh entry.sh mod autoload        # 读取状态
+stdout: enabled=true | enabled=false
+
+sh entry.sh mod autoload on     # 复制脚本，chmod 755
+sh entry.sh mod autoload off    # 删除脚本
+stdout: enabled=true | enabled=false
+```
+
+| 退出码 | 含义                   |
+| ------ | ---------------------- |
+| `0`    | 成功                   |
+| `1`    | 参数不是 `on` / `off`  |
+| `4`    | 复制、chmod 或删除失败 |
+
+卸载模块时 `uninstall.sh` 会删掉这个脚本，避免残留。
+
+### 5.16 上游相关环境变量
 
 | 变量              | 说明                                                                               |
 | ----------------- | ---------------------------------------------------------------------------------- |
@@ -328,7 +352,7 @@ UPSTREAM_MIRROR='https://ghfast.top/' \
 sh entry.sh mod check
 ```
 
-### 5.16 日志等级过滤
+### 5.17 日志等级过滤
 
 `log <level> <message>` 只输出大于等于当前等级的日志：
 

@@ -1,10 +1,17 @@
 #!/system/bin/sh
 
-# KernelSU 在 post-fs-data 阶段执行本脚本。
+# WebUI 的开关会把本脚本复制到 /data/adb/post-fs-data.d/<id>.sh，
+# KernelSU 在 post-fs-data 阶段执行它。
 # 故意不 source lib/*.sh：启动路径必须独立，辅助脚本出错也不能拖住开机。
 # 日志直接追加到模块日志，格式与 lib/log.sh 保持一致。
 
 MODDIR=${0%/*}
+
+# 从 post-fs-data.d 执行时脚本不在模块目录里，按文件名回推模块目录。
+if [ ! -d "${MODDIR}/lib" ]; then
+    MODDIR="/data/adb/modules/$(basename "$0" .sh)"
+fi
+
 DATA_DIR="/data/adb/$(basename "${MODDIR}")"
 KO_FILE="${DATA_DIR}/mod/susfs_guard_lkm.ko"
 LOG_FILE="${DATA_DIR}/logs/module.log"

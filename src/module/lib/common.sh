@@ -107,6 +107,7 @@ if _upstream_url_valid "$UPSTREAM_MIRROR_ENV"; then
 fi
 
 . "${MODDIR}/lib/log.sh"
+. "${MODDIR}/lib/autoload.sh"
 . "${MODDIR}/lib/download.sh"
 . "${MODDIR}/lib/upstream.sh"
 . "${MODDIR}/lib/status.sh"

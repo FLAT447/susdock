@@ -12,10 +12,11 @@ import { parseVersion } from "./version.ts";
  */
 
 const entries = [
+    "autoload.sh",
     "entries",
     "entry.sh",
     "lib",
-    "post-fs-data.sh",
+    "uninstall.sh",
 ];
 
 const rootPath = join(import.meta.dirname, "..");

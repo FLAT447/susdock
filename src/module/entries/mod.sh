@@ -111,6 +111,37 @@ mod_upstream() {
     return 0
 }
 
+# Toggle boot-time autoload. With no argument, print the current state.
+# Usage: mod_autoload [on|off]
+mod_autoload() {
+    _mode="${1:-}"
+
+    case "$_mode" in
+        "")
+            if autoload_enabled; then
+                echo "enabled=true"
+            else
+                echo "enabled=false"
+            fi
+            return 0
+            ;;
+        on)
+            autoload_enable || return "$MOD_ERR_WRITE"
+            echo "enabled=true"
+            return 0
+            ;;
+        off)
+            autoload_disable || return "$MOD_ERR_WRITE"
+            echo "enabled=false"
+            return 0
+            ;;
+        *)
+            log ERROR "invalid autoload mode: $_mode"
+            return 1
+            ;;
+    esac
+}
+
 # Dispatch mod subcommands
 # Usage: mod_dispatch <subcommand> [args...]
 mod_dispatch() {
@@ -122,6 +153,7 @@ mod_dispatch() {
         version) mod_version "$@" ;;
         clear-reboot) mod_clear_reboot "$@" ;;
         upstream) mod_upstream "$@" ;;
+        autoload) mod_autoload "$@" ;;
         *) err "unknown mod subcommand: ${_sub:-<empty>}" ;;
     esac
 }
