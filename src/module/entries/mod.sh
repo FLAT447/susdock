@@ -12,32 +12,32 @@ MOD_ERR_WRITE=4
 # Usage: mod_update <version> <url> <sha256>
 # Returns 0 on success, non-zero on failure
 mod_update() {
-    _ver="${1:-}"
-    _url="${2:-}"
-    _sha="${3:-}"
+    _up_ver="${1:-}"
+    _up_url="${2:-}"
+    _up_sha="${3:-}"
 
-    [ -n "$_ver" ] && [ -n "$_url" ] && [ -n "$_sha" ] || {
+    [ -n "$_up_ver" ] && [ -n "$_up_url" ] && [ -n "$_up_sha" ] || {
         log ERROR "usage: mod update <version> <url> <sha256>"
         return "$MOD_ERR_CHECK"
     }
 
-    case "$_url" in
+    case "$_up_url" in
         https://?*) ;;
         *)
-            log ERROR "invalid download url: $_url"
+            log ERROR "invalid download url: $_up_url"
             return "$MOD_ERR_CHECK"
             ;;
     esac
 
     # Accept upper case from callers, compare in lower case like sha256sum.
-    _sha=$(printf '%s' "$_sha" | tr '[:upper:]' '[:lower:]')
-    case "$_sha" in
+    _up_sha=$(printf '%s' "$_up_sha" | tr '[:upper:]' '[:lower:]')
+    case "$_up_sha" in
         *[!0-9a-f]*)
             log ERROR "invalid sha256"
             return "$MOD_ERR_HASH"
             ;;
     esac
-    [ "${#_sha}" -eq 64 ] || {
+    [ "${#_up_sha}" -eq 64 ] || {
         log ERROR "invalid sha256"
         return "$MOD_ERR_HASH"
     }
@@ -47,7 +47,7 @@ mod_update() {
         return "$MOD_ERR_WRITE"
     }
 
-    download "$_url" "$UPSTREAM_LOCAL_TARGET" || {
+    download "$_up_url" "$UPSTREAM_LOCAL_TARGET" || {
         log ERROR "download failed"
         return "$MOD_ERR_DOWNLOAD"
     }
@@ -57,13 +57,13 @@ mod_update() {
         return "$MOD_ERR_WRITE"
     }
 
-    _actual=$(sha256sum "$UPSTREAM_LOCAL_TARGET" 2> /dev/null | awk '{print $1}')
-    [ "$_actual" = "$_sha" ] || {
-        log ERROR "sha256 mismatch: expected=$_sha actual=$_actual"
+    _up_actual=$(sha256sum "$UPSTREAM_LOCAL_TARGET" 2> /dev/null | awk '{print $1}')
+    [ "$_up_actual" = "$_up_sha" ] || {
+        log ERROR "sha256 mismatch: expected=$_up_sha actual=$_up_actual"
         return "$MOD_ERR_HASH"
     }
 
-    echo "$_ver" > "$UPSTREAM_VERSION_FILE" || {
+    echo "$_up_ver" > "$UPSTREAM_VERSION_FILE" || {
         log ERROR "cannot write version file"
         return "$MOD_ERR_WRITE"
     }
@@ -79,7 +79,7 @@ mod_update() {
         autoload_enable || log WARN "failed to refresh autoload script"
     fi
 
-    log INFO "update installed: $_ver (reboot to take effect)"
+    log INFO "update installed: $_up_ver (reboot to take effect)"
     return 0
 }
 

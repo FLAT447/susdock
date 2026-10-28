@@ -33,9 +33,9 @@ release_json() {
     }
 
     cat "$_json_file"
-    _rc=$?
+    _json_rc=$?
     rm -f "$_json_file"
-    return "$_rc"
+    return "$_json_rc"
 }
 
 # Get local version from config file
@@ -47,12 +47,12 @@ get_local_version() {
         return "$US_ERR_NOFILE"
     }
 
-    _v=$(tr -d '[:space:]' < "$UPSTREAM_VERSION_FILE" 2> /dev/null)
-    [ -n "$_v" ] || {
+    _local_ver=$(tr -d '[:space:]' < "$UPSTREAM_VERSION_FILE" 2> /dev/null)
+    [ -n "$_local_ver" ] || {
         log ERROR "local version file is empty"
         return "$US_ERR_NOFILE"
     }
 
-    echo "$_v"
+    echo "$_local_ver"
     return 0
 }

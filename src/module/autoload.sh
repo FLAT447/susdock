@@ -18,12 +18,12 @@ LOG_FILE="${DATA_DIR}/logs/module.log"
 MODULE_NAME="susfs_guard_lkm"
 
 log() {
-    _ts=$(date '+%Y-%m-%d %H:%M:%S' 2> /dev/null || echo "----")
-    _line="[${_ts}] [INFO] $*"
+    _al_ts=$(date '+%Y-%m-%d %H:%M:%S' 2> /dev/null || echo "----")
+    _al_line="[${_al_ts}] [INFO] $*"
 
     mkdir -p "${DATA_DIR}/logs" 2> /dev/null
-    echo "${_line}" >> "${LOG_FILE}" 2> /dev/null
-    echo "${_line}" >&2
+    echo "${_al_line}" >> "${LOG_FILE}" 2> /dev/null
+    echo "${_al_line}" >&2
 }
 
 # 模块被 KernelSU 禁用时不加载。本脚本在 post-fs-data.d/ 里，
@@ -46,11 +46,11 @@ if lsmod 2> /dev/null | grep -q "^${MODULE_NAME} "; then
 fi
 
 # 绝对路径，避免 post-fs-data 阶段工作目录不确定。
-if _out=$(insmod "${KO_FILE}" 2>&1); then
+if _al_out=$(insmod "${KO_FILE}" 2>&1); then
     log "susfs: loaded ${KO_FILE}"
     # 新驱动已经在跑，重启标记不再需要。
     rm -f "${DATA_DIR}/mod/reboot" 2> /dev/null
 else
-    log "susfs: insmod failed: ${_out:-unknown error}"
+    log "susfs: insmod failed: ${_al_out:-unknown error}"
     exit 1
 fi

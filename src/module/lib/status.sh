@@ -27,13 +27,13 @@ susfs_version() {
         return "$ST_ERR_TOOL"
     }
 
-    _raw=$("$SUSFS_KSU_SUSFS_BIN" show version 2> /dev/null)
-    [ -n "$_raw" ] || {
+    _sv_raw=$("$SUSFS_KSU_SUSFS_BIN" show version 2> /dev/null)
+    [ -n "$_sv_raw" ] || {
         log ERROR "failed to get susfs version"
         return "$ST_ERR_VERSION"
     }
 
-    echo "${_raw#v}"
+    echo "${_sv_raw#v}"
     return 0
 }
 
@@ -54,13 +54,13 @@ android_version() {
         return "$ST_ERR_TOOL"
     }
 
-    _ver=$(getprop ro.build.version.release 2> /dev/null)
-    [ -n "$_ver" ] || {
+    _av_ver=$(getprop ro.build.version.release 2> /dev/null)
+    [ -n "$_av_ver" ] || {
         log ERROR "failed to get android version"
         return "$ST_ERR_VERSION"
     }
 
-    echo "$_ver"
+    echo "$_av_ver"
     return 0
 }
 
@@ -74,13 +74,13 @@ kernel_version() {
         return "$ST_ERR_TOOL"
     }
 
-    _raw=$(uname -r 2> /dev/null)
-    [ -n "$_raw" ] || {
+    _kv_raw=$(uname -r 2> /dev/null)
+    [ -n "$_kv_raw" ] || {
         log ERROR "failed to get kernel version"
         return "$ST_ERR_VERSION"
     }
 
     # "5.15.77-perf" -> "5.15"
-    echo "$_raw" | awk -F. '{print $1"."$2}'
+    echo "$_kv_raw" | awk -F. '{print $1"."$2}'
     return 0
 }
