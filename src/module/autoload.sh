@@ -48,6 +48,8 @@ fi
 # 绝对路径，避免 post-fs-data 阶段工作目录不确定。
 if _out=$(insmod "${KO_FILE}" 2>&1); then
     log "susfs: loaded ${KO_FILE}"
+    # 新驱动已经在跑，重启标记不再需要。
+    rm -f "${DATA_DIR}/mod/reboot" 2> /dev/null
 else
     log "susfs: insmod failed: ${_out:-unknown error}"
     exit 1
