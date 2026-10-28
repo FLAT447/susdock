@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SusDock Web UI</title>
+    <script>
+        // 在样式生效前定好主题，避免第一屏先按浅色渲染再切成深色。
+        (function () {
+            try {
+                var saved = localStorage.getItem("theme");
+                var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                if (dark) {
+                    document.documentElement.classList.add("dark");
+                }
+            }
+            catch (e) {
+                // 读不了 localStorage 就保持默认浅色
+            }
+        })();
+    </script>
 </head>
 <body>
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
