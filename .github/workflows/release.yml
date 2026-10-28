@@ -27,6 +27,15 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile
 
+      - name: lint
+        run: pnpm lint
+
+      - name: typecheck
+        run: pnpm --filter webui exec tsc --noEmit
+
+      - name: test
+        run: pnpm test
+
       - name: version
         id: version
         run: |
