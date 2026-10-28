@@ -26,6 +26,13 @@ log() {
     echo "${_line}" >&2
 }
 
+# 模块被 KernelSU 禁用时不加载。本脚本在 post-fs-data.d/ 里，
+# 不受模块启用状态影响，必须自己检查。
+[ -f "${MODDIR}/disable" ] && {
+    log "susfs: module is disabled, skip loading"
+    exit 0
+}
+
 # 没下载过驱动时静默跳过：全新安装还没点过更新，属于正常状态。
 [ -f "${KO_FILE}" ] || {
     log "susfs: driver not found, skip loading: ${KO_FILE}"
