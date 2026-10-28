@@ -51,11 +51,14 @@ ghfast.top 只代理文件下载，不接 `api.github.com`（实测返回 403）
 ```sh
 pnpm install
 pnpm dev          # WebUI 开发服务器
-pnpm build        # 打包模块，产物在 dist/
+pnpm build        # 构建模块，产物在 dist/source/
+pnpm run pack     # 把 dist/source/ 压成 dist/<id>-v<version>-<versionCode>.zip
 pnpm lint         # ESLint + shfmt + shellcheck
 ```
 
-`dist/webroot/` 是 KernelSU 读取的 WebUI 目录，`dist/module.prop` 由构建脚本生成。
+`dist/source/webroot/` 是 KernelSU 读取的 WebUI 目录，`dist/source/module.prop` 由构建脚本生成。
+
+`build` 和 `pack` 分开是有意的：`build` 只产出目录树，`pack` 只负责打归档，所以本地改完可以直接重打包，不必重跑 WebUI 构建。归档根目录就是 `dist/source/` 的内容，可以直接刷入。Release 工作流两步都会跑。
 
 提交前会自动跑一遍 ESLint（`.githooks/pre-commit`），`pnpm install` 时通过 `core.hooksPath` 挂上。
 

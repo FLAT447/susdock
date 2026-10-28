@@ -21,6 +21,8 @@ const rootPath = join(import.meta.dirname, "..");
 const modulePath = join(rootPath, "src/module");
 const webuiDistPath = join(rootPath, "src/webui/dist");
 const distPath = join(rootPath, "dist");
+// 模块文件先落到 dist/source，再由它压成 dist/<name>-<tag>.zip
+const sourcePath = join(distPath, "source");
 
 function buildModuleProps() {
     return {
@@ -56,15 +58,15 @@ function main(): void {
     const moduleProps = buildModuleProps();
 
     rmSync(distPath, { recursive: true, force: true });
-    mkdirSync(distPath, { recursive: true });
-    writeFileSync(join(distPath, "module.prop"), renderModuleProp(moduleProps));
+    mkdirSync(sourcePath, { recursive: true });
+    writeFileSync(join(sourcePath, "module.prop"), renderModuleProp(moduleProps));
 
     for (const entry of entries) {
         log(`Copying entry(${entry})...`, Types.detail);
         const path = join(modulePath, entry);
         if (!existsSync(path))
             throw new Error(`"${entry}" does not exist at "${path}"!`);
-        cpSync(path, join(distPath, entry), { recursive: true });
+        cpSync(path, join(sourcePath, entry), { recursive: true });
     }
 
     log("Module build completed successfully.", Types.success);
@@ -82,7 +84,7 @@ function main(): void {
         throw new Error(`WebUI dist not found at "${webuiDistPath}"`);
 
     // KernelSU only serves the WebUI from a `webroot` directory.
-    cpSync(webuiDistPath, join(distPath, "webroot"), { recursive: true });
+    cpSync(webuiDistPath, join(sourcePath, "webroot"), { recursive: true });
     log("WebUI build completed successfully.", Types.success);
 }
 

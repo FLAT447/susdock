@@ -1,12 +1,12 @@
 name: Make Update
 on:
   workflow_run:
-    workflows: ["Release"]
+    workflows: [Release]
     types: [completed]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Manual tag (e.g., v0.3.0-300)'
+        description: "Manual tag (e.g., v0.3.0-300)"
         required: true
 
 jobs:
